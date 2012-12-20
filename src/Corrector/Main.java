@@ -151,7 +151,7 @@ public class Main extends Configured implements Tool
 	{
         Graph2Fasta g2f = new Graph2Fasta();
 		start("convertFasta " + graphdir);
-		RunningJob job = g2f.run(basePath + graphdir, fastadir);
+		RunningJob job = g2f.run(basePath + graphdir, fastadir.substring(0,fastadir.length()-1) +".fa");
         FileSystem.get(baseconf).delete(new Path(basePath), true);
         end(job);
         msg("\n");
@@ -326,7 +326,7 @@ public class Main extends Configured implements Tool
 
         if (runStage("convertFasta"))
         {
-            convertFasta(Config.hadoopTmpPath, error, Config.hadoopBasePath+".fa");
+            convertFasta(Config.hadoopTmpPath, error, Config.hadoopBasePath);
             checkDone();
         }
 		

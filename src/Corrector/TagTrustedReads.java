@@ -64,11 +64,8 @@ public class TagTrustedReads extends Configured implements Tool
 	public static class TagTrustedReadsReducer extends MapReduceBase
 	implements Reducer<Text, Text, Text, Text>
 	{
-        private static long KmerCov = 0;
-        private static long LowBound = 3;
 		public void configure(JobConf job) {
-            //KmerCov = Long.parseLong(job.get("KmerCov")); 
-            KmerCov = (long)Float.parseFloat(job.get("EXPCOV"));
+           
 		}
         
 		public void reduce(Text prefix, Iterator<Text> iter,

@@ -74,11 +74,11 @@ public class PreCorrect extends Configured implements Tool
                 String window_r = Node.str2dna(window_r_tmp);
                 int f_pos = i + (IDX/2);
                 int r_pos = node.len()-(IDX/2+1)-i;
-                if ( !window_tmp.matches("A*") && !window_tmp.matches("T*") ) {
+                if ( !window_tmp.matches("A*") && !window_tmp.matches("T*") && !window_tmp.equals(window_r_tmp)) {
                     output.collect(new Text(window),
                                    new Text(node.getNodeId() + "\t" + "f" + "\t" + f_pos + "\t" + node.str().charAt(f_pos) + "\t" + node.Qscore_1().charAt(f_pos)));
                 }
-                if (!window_tmp.matches("A*") && !window_tmp.matches("T*") ) {
+                if (!window_tmp.matches("A*") && !window_tmp.matches("T*") && !window_tmp.equals(window_r_tmp)) {
                     output.collect(new Text(window_r),
                                    new Text(node.getNodeId() + "\t" + "r" + "\t" + r_pos + "\t" + Node.rc(node.str().charAt(r_pos) + "") + "\t" + node.Qscore_1().charAt(r_pos)));
                 }

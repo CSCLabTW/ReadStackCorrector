@@ -27,7 +27,7 @@ public class Config {
     // important paths
 	public static String hadoopReadPath = null;
 	public static String hadoopBasePath = null;
-    public static String hadoopTmpPath = null;
+	public static String hadoopTmpPath = null;
 	public static String localBasePath = "work";
 
 	// hadoop options
@@ -40,7 +40,7 @@ public class Config {
 	// Assembler options
 	public static String STARTSTAGE = null;
 	public static String STOPSTAGE = null;
-    public static int QV_ASCII = 33;
+	public static int QV_ASCII = 33;
 
     // restart options
 	public static boolean validateonly = false;
@@ -53,19 +53,19 @@ public class Config {
 
     // initial node construction
 	public static long K = -1;
-    public static long READLEN = 36;
+	public static long READLEN = 36;
     
   
     // kmer status
-    public static long LOW_KMER = 1;
-    public static long UP_KMER = 250;
+	public static long LOW_KMER = 1;
+	public static long UP_KMER = 250;
 
     // stats
 	public static String RUN_STATS = null;
 	public static long  N50_TARGET = -1;
 	public static String CONVERT_FA = null;
 
-    public static void validateConfiguration()
+	public static void validateConfiguration()
 	{
         int err = 0;
         if ((RUN_STATS == null) && (CONVERT_FA == null)) {

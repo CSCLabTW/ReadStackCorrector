@@ -76,12 +76,12 @@ public class FindError extends Configured implements Tool
                 String window_r = Node.str2dna(window_r_tmp);
                 int f_pos = i;
                 int r_pos = i;
-                if ( !window_tmp.matches("A*") && !window_tmp.matches("T*") ) {
+                if ( !window_tmp.matches("A*") && !window_tmp.matches("T*") && !window_tmp.equals(window_r_tmp) ) {
                     output.collect(new Text(window),
                                    new Text(node.getNodeId() + "\t" + "f" + "\t" + f_pos + "\t" + node.str_raw() + "\t" + node.Qscore_1()));
                 }
                 String Qscore_reverse = new StringBuffer(node.Qscore_1()).reverse().toString();
-                if (!window_tmp.matches("A*") && !window_tmp.matches("T*") ) {
+                if (!window_tmp.matches("A*") && !window_tmp.matches("T*") && !window_tmp.equals(window_r_tmp) ) {
                     output.collect(new Text(window_r),
                                    new Text(node.getNodeId() + "\t" + "r" + "\t" + r_pos + "\t" + node.str_raw() + "\t" + Qscore_reverse));
                 }
@@ -213,9 +213,13 @@ public class FindError extends Configured implements Tool
             }
             //\\
             int [][] IDX_lose = new int[IDX][4];
+            int [][] IDX_array = new int[IDX][6];
             for(int i=0; i < IDX; i++) {
-                for(int j=0; j < 4; j++){
-                    IDX_lose[i][j] = 0;
+                for(int j=0; j < 6; j++){
+                    IDX_array[i][j] = 0;
+                	if ( j < 4){
+                    	IDX_lose[i][j] = 0;
+                    }
                 }
             }
             //\\
@@ -268,17 +272,22 @@ public class FindError extends Configured implements Tool
                     } else if (quality_value > 40) {
                         quality_value = 40;
                     }
+                    IDX_array[j-readarray[i].pos][4] = IDX_array[j-readarray[i].pos][4] + 1;
                     if (readarray[i].seq[j] == 'A') {
-                        if  (quality_value >= 20)
+                        IDX_array[j-readarray[i].pos][0]= IDX_array[j-readarray[i].pos][0] + quality_value;
+                    	if  (quality_value >= 20)
                             IDX_lose[j-readarray[i].pos][0] = IDX_lose[j-readarray[i].pos][0]+1;
                     } else if (readarray[i].seq[j] == 'T') { 
-                        if  (quality_value >= 20)
+                    	IDX_array[j-readarray[i].pos][1]= IDX_array[j-readarray[i].pos][1] + quality_value;
+                    	if  (quality_value >= 20)
                             IDX_lose[j-readarray[i].pos][1] = IDX_lose[j-readarray[i].pos][1]+1;
                     } else if (readarray[i].seq[j] == 'C') { 
-                        if  (quality_value >= 20)
+                    	IDX_array[j-readarray[i].pos][2]= IDX_array[j-readarray[i].pos][2] + quality_value;
+                    	if  (quality_value >= 20)
                             IDX_lose[j-readarray[i].pos][2] = IDX_lose[j-readarray[i].pos][2]+1;
                     } else if (readarray[i].seq[j] == 'G') {
-                        if  (quality_value >= 20)
+                    	IDX_array[j-readarray[i].pos][3]= IDX_array[j-readarray[i].pos][3] + quality_value;
+                    	if  (quality_value >= 20)
                             IDX_lose[j-readarray[i].pos][3] = IDX_lose[j-readarray[i].pos][3]+1;
                     }
                 }
@@ -312,47 +321,101 @@ public class FindError extends Configured implements Tool
                 }        
             }
             
-            int majority = 40;
+            int majority = 2;
             int reads_threshold = 6;
             // compute left consensus
             String left_consensus = "";
+            int left_branch=-1;
             for(int i=0; i < left_array.length; i++){
-                if ( left_array[i][0] > left_array[i][1] && left_array[i][0] > left_array[i][2] && left_array[i][0] > left_array[i][3] && left_array[i][0] >= majority && left_array[i][4] >= reads_threshold) {
+                if ( left_array[i][0] > left_array[i][1] && left_array[i][0] > left_array[i][2] && left_array[i][0] > left_array[i][3] /*&& left_lose[i][0] >= majority && left_array[i][4] >= reads_threshold*/) {
                     left_consensus = left_consensus + "A";
                     left_array[i][5] = left_array[i][0];
-                } else if (left_array[i][1] > left_array[i][0] && left_array[i][1] > left_array[i][2] && left_array[i][1] > left_array[i][3] && left_array[i][1] >= majority && left_array[i][4] >= reads_threshold) {
+                } else if (left_array[i][1] > left_array[i][0] && left_array[i][1] > left_array[i][2] && left_array[i][1] > left_array[i][3] /*&& left_lose[i][1] >= majority && left_array[i][4] >= reads_threshold*/) {
                     left_consensus = left_consensus + "T";
                     left_array[i][5] = left_array[i][1];
-                } else if (left_array[i][2] > left_array[i][0] && left_array[i][2] > left_array[i][1] && left_array[i][2] > left_array[i][3] && left_array[i][2] >= majority && left_array[i][4] >= reads_threshold) {
+                } else if (left_array[i][2] > left_array[i][0] && left_array[i][2] > left_array[i][1] && left_array[i][2] > left_array[i][3] /*&& left_lose[i][2] >= majority && left_array[i][4] >= reads_threshold*/) {
                     left_consensus = left_consensus + "C";
                     left_array[i][5] = left_array[i][2];
-                } else if (left_array[i][3] > left_array[i][0] && left_array[i][3] > left_array[i][1] && left_array[i][3] > left_array[i][2] && left_array[i][3] >= majority && left_array[i][4] >= reads_threshold) {
+                } else if (left_array[i][3] > left_array[i][0] && left_array[i][3] > left_array[i][1] && left_array[i][3] > left_array[i][2] /*&& left_lose[i][3] >= majority && left_array[i][4] >= reads_threshold*/) {
                     left_consensus = left_consensus + "G";
                     left_array[i][5] = left_array[i][3];
                 } else {
                     left_consensus = left_consensus + "N";
                     left_array[i][5] = left_array[i][0];
                 }
+                //\\ apply branch
+                int support = 0;
+                if (left_lose[i][0] >= majority ){
+                	support = support +1;
+                }
+                if (left_lose[i][1] >= majority ){
+                	support = support +1;
+                }
+                if (left_lose[i][2] >= majority ){
+                	support = support +1;
+                }
+                if (left_lose[i][3] >= majority ){
+                	support = support +1;
+                }
+                if (support >=2){
+                	left_branch =i;
+                }
             }
+            //\\ apply branch, using N to replace char before left_branch point
+            String left_branch_str="";
+            if (left_branch >= 0) {
+            	left_branch = left_branch -1; //exclude branch point
+            }
+            for (int i=0; i<= left_branch;i++) {
+            	left_branch_str = left_branch_str+ "N";
+            }
+            left_consensus = left_branch_str + left_consensus.substring(left_branch_str.length());
+            //\\\\\\\\\
             // compute right consensus
             String right_consensus = "";
+            int right_branch=-1;
             for(int i=0; i < right_array.length; i++){
-                if (right_array[i][0] > right_array[i][1] && right_array[i][0] > right_array[i][2] && right_array[i][0] > right_array[i][3] && right_array[i][0] >= majority && right_array[i][4] >= reads_threshold) {
+                if (right_array[i][0] > right_array[i][1] && right_array[i][0] > right_array[i][2] && right_array[i][0] > right_array[i][3] /*&& right_lose[i][0] >= majority && right_array[i][4] >= reads_threshold*/) {
                     right_consensus = right_consensus + "A";
                     right_array[i][5] = right_array[i][0];
-                } else if (right_array[i][1] > right_array[i][0] && right_array[i][1] > right_array[i][2] && right_array[i][1] > right_array[i][3] && right_array[i][1] >= majority && right_array[i][4] >= reads_threshold) {
+                } else if (right_array[i][1] > right_array[i][0] && right_array[i][1] > right_array[i][2] && right_array[i][1] > right_array[i][3] /*&& right_lose[i][1] >= majority && right_array[i][4] >= reads_threshold*/) {
                     right_consensus = right_consensus + "T";
                     right_array[i][5] = right_array[i][1];
-                } else if (right_array[i][2] > right_array[i][0] && right_array[i][2] > right_array[i][1] && right_array[i][2] > right_array[i][3] && right_array[i][2] >= majority && right_array[i][4] >= reads_threshold) {
+                } else if (right_array[i][2] > right_array[i][0] && right_array[i][2] > right_array[i][1] && right_array[i][2] > right_array[i][3] /*&& right_lose[i][2] >= majority && right_array[i][4] >= reads_threshold*/) {
                     right_consensus = right_consensus + "C";
                     right_array[i][5] = right_array[i][2];
-                } else if (right_array[i][3] > right_array[i][0] && right_array[i][3] > right_array[i][1] && right_array[i][3] > right_array[i][2] && right_array[i][3] >= majority && right_array[i][4] >= reads_threshold) {
+                } else if (right_array[i][3] > right_array[i][0] && right_array[i][3] > right_array[i][1] && right_array[i][3] > right_array[i][2] /*&& right_lose[i][3] >= majority && right_array[i][4] >= reads_threshold*/) {
                     right_consensus = right_consensus + "G";
                     right_array[i][5] = right_array[i][3];
                 } else {
                     right_consensus = right_consensus + "N";
                     right_array[i][5] = right_array[i][0];
                 }
+              //\\ apply branch
+                int support = 0;
+                if (right_lose[i][0] >= majority ){
+                	support = support +1;
+                }
+                if (right_lose[i][1] >= majority ){
+                	support = support +1;
+                }
+                if (right_lose[i][2] >= majority ){
+                	support = support +1;
+                }
+                if (right_lose[i][3] >= majority ){
+                	support = support +1;
+                }
+                if (support >=2 && right_branch < 0){
+                	right_branch =i;
+                }
+            }
+            //\\ apply branch, using N to replace char after right_branch point
+            if (right_branch >= 0) {
+	            String right_branch_str="";
+	            for (int i=0; i< right_consensus.length()-(right_branch+1);i++) {
+	            	right_branch_str = right_branch_str+ "N";
+	            }
+	            right_consensus = right_consensus.substring(0,right_branch+1)+right_branch_str;
             }
             
             Node node = new Node(readarray[0].id);
@@ -368,16 +431,16 @@ public class FindError extends Configured implements Tool
                     if (left_consensus.charAt(left_len - readarray[i].pos + j) == readarray[i].seq[j]) {
                         // Comfirmation
                         boolean confirm = false;
-                        if (left_lose[left_len - readarray[i].pos + j][0] >= 3 && readarray[i].seq[j] == 'A' && (left_lose[left_len - readarray[i].pos + j][1] <=2 && left_lose[left_len - readarray[i].pos + j][2] <=2 && left_lose[left_len - readarray[i].pos + j][3] <= 2)) {
+                        if (left_lose[left_len - readarray[i].pos + j][0] >= 3 && readarray[i].seq[j] == 'A' && (left_lose[left_len - readarray[i].pos + j][1] < 2 && left_lose[left_len - readarray[i].pos + j][2] < 2 && left_lose[left_len - readarray[i].pos + j][3] < 2)) {
                             confirm = true;
                         }
-                        if (left_lose[left_len - readarray[i].pos + j][1] >= 3 && readarray[i].seq[j] == 'T' && (left_lose[left_len - readarray[i].pos + j][0] <=2 && left_lose[left_len - readarray[i].pos + j][2] <=2 && left_lose[left_len - readarray[i].pos + j][3] <= 2)) {
+                        if (left_lose[left_len - readarray[i].pos + j][1] >= 3 && readarray[i].seq[j] == 'T' && (left_lose[left_len - readarray[i].pos + j][0] < 2 && left_lose[left_len - readarray[i].pos + j][2] < 2 && left_lose[left_len - readarray[i].pos + j][3] < 2)) {
                             confirm = true;
                         }
-                        if (left_lose[left_len - readarray[i].pos + j][2] >= 3 && readarray[i].seq[j] == 'C' && (left_lose[left_len - readarray[i].pos + j][0] <=2 && left_lose[left_len - readarray[i].pos + j][1] <=2 && left_lose[left_len - readarray[i].pos + j][3] <= 2)) {
+                        if (left_lose[left_len - readarray[i].pos + j][2] >= 3 && readarray[i].seq[j] == 'C' && (left_lose[left_len - readarray[i].pos + j][0] < 2 && left_lose[left_len - readarray[i].pos + j][1] < 2 && left_lose[left_len - readarray[i].pos + j][3] < 2)) {
                             confirm = true;
                         }
-                        if (left_lose[left_len - readarray[i].pos + j][3] >= 3 && readarray[i].seq[j] == 'G' && (left_lose[left_len - readarray[i].pos + j][0] <=2 && left_lose[left_len - readarray[i].pos + j][1] <=2 && left_lose[left_len - readarray[i].pos + j][2] <= 2)) {
+                        if (left_lose[left_len - readarray[i].pos + j][3] >= 3 && readarray[i].seq[j] == 'G' && (left_lose[left_len - readarray[i].pos + j][0] < 2 && left_lose[left_len - readarray[i].pos + j][1] < 2 && left_lose[left_len - readarray[i].pos + j][2] < 2)) {
                             confirm = true;
                         }
                         if (confirm ) {
@@ -417,16 +480,16 @@ public class FindError extends Configured implements Tool
                     } else {
                         if (!(left_consensus.charAt(left_len - readarray[i].pos + j) == 'N')) {
                             //\\
-                            if(readarray[i].seq[j] == 'A' && ( left_lose[left_len - readarray[i].pos + j][0] > 2 || (float)left_array[left_len - readarray[i].pos + j][0]/(float)left_array[left_len - readarray[i].pos + j][5] > 0.25f)) {
+                            if(readarray[i].seq[j] == 'A' && ( left_lose[left_len - readarray[i].pos + j][0] >= 2 || (float)left_array[left_len - readarray[i].pos + j][0]/(float)left_array[left_len - readarray[i].pos + j][5] > 0.25f)) {
                                 continue;
                             }
-                            if(readarray[i].seq[j] == 'T' && ( left_lose[left_len - readarray[i].pos + j][1] > 2 || (float)left_array[left_len - readarray[i].pos + j][1]/(float)left_array[left_len - readarray[i].pos + j][5] > 0.25f)) {
+                            if(readarray[i].seq[j] == 'T' && ( left_lose[left_len - readarray[i].pos + j][1] >= 2 || (float)left_array[left_len - readarray[i].pos + j][1]/(float)left_array[left_len - readarray[i].pos + j][5] > 0.25f)) {
                                 continue;
                             }
-                            if(readarray[i].seq[j] == 'C' && ( left_lose[left_len - readarray[i].pos + j][2] > 2 || (float)left_array[left_len - readarray[i].pos + j][2]/(float)left_array[left_len - readarray[i].pos + j][5] > 0.25f)) {
+                            if(readarray[i].seq[j] == 'C' && ( left_lose[left_len - readarray[i].pos + j][2] >= 2 || (float)left_array[left_len - readarray[i].pos + j][2]/(float)left_array[left_len - readarray[i].pos + j][5] > 0.25f)) {
                                 continue;
                             }
-                            if(readarray[i].seq[j] == 'G' && ( left_lose[left_len - readarray[i].pos + j][3] > 2 || (float)left_array[left_len - readarray[i].pos + j][3]/(float)left_array[left_len - readarray[i].pos + j][5] > 0.25f)) {
+                            if(readarray[i].seq[j] == 'G' && ( left_lose[left_len - readarray[i].pos + j][3] >= 2 || (float)left_array[left_len - readarray[i].pos + j][3]/(float)left_array[left_len - readarray[i].pos + j][5] > 0.25f)) {
                                 continue;
                             }
                             if (readarray[i].dir.equals("f")){
@@ -524,16 +587,16 @@ public class FindError extends Configured implements Tool
                     if (right_consensus.charAt(j-readarray[i].pos-IDX) == readarray[i].seq[j]){
                         // Comfirmation
                         boolean confirm = false;
-                        if (readarray[i].seq[j] == 'A' && ( right_lose[j-readarray[i].pos-IDX][1] <=2 && right_lose[j-readarray[i].pos-IDX][2] <=2 && right_lose[j-readarray[i].pos-IDX][3] <= 2) && right_lose[j-readarray[i].pos-IDX][0] >= 3 ) {
+                        if (readarray[i].seq[j] == 'A' && ( right_lose[j-readarray[i].pos-IDX][1] < 2 && right_lose[j-readarray[i].pos-IDX][2] < 2 && right_lose[j-readarray[i].pos-IDX][3] < 2) && right_lose[j-readarray[i].pos-IDX][0] >= 3 ) {
                             confirm = true;
                         }
-                        if (readarray[i].seq[j] == 'T' && ( right_lose[j-readarray[i].pos-IDX][0] <=2 && right_lose[j-readarray[i].pos-IDX][2] <=2 && right_lose[j-readarray[i].pos-IDX][3] <= 2) && right_lose[j-readarray[i].pos-IDX][1] >= 3 ) {
+                        if (readarray[i].seq[j] == 'T' && ( right_lose[j-readarray[i].pos-IDX][0] < 2 && right_lose[j-readarray[i].pos-IDX][2] < 2 && right_lose[j-readarray[i].pos-IDX][3] < 2) && right_lose[j-readarray[i].pos-IDX][1] >= 3 ) {
                             confirm = true;
                         }
-                        if (readarray[i].seq[j] == 'C' && ( right_lose[j-readarray[i].pos-IDX][0] <=2 && right_lose[j-readarray[i].pos-IDX][1] <=2 && right_lose[j-readarray[i].pos-IDX][3] <= 2) && right_lose[j-readarray[i].pos-IDX][2] >= 3 ) {
+                        if (readarray[i].seq[j] == 'C' && ( right_lose[j-readarray[i].pos-IDX][0] < 2 && right_lose[j-readarray[i].pos-IDX][1] < 2 && right_lose[j-readarray[i].pos-IDX][3] < 2) && right_lose[j-readarray[i].pos-IDX][2] >= 3 ) {
                             confirm = true;
                         }
-                        if (readarray[i].seq[j] == 'G' && ( right_lose[j-readarray[i].pos-IDX][0] <=2 && right_lose[j-readarray[i].pos-IDX][1] <=2 && right_lose[j-readarray[i].pos-IDX][2] <= 2) && right_lose[j-readarray[i].pos-IDX][3] >= 3 ) {
+                        if (readarray[i].seq[j] == 'G' && ( right_lose[j-readarray[i].pos-IDX][0] < 2 && right_lose[j-readarray[i].pos-IDX][1] < 2 && right_lose[j-readarray[i].pos-IDX][2] < 2) && right_lose[j-readarray[i].pos-IDX][3] >= 3 ) {
                             confirm = true;
                         }
                         
@@ -574,16 +637,16 @@ public class FindError extends Configured implements Tool
                     } else {
                         if (!(right_consensus.charAt(j-readarray[i].pos-IDX) == 'N')) {
                             //\\
-                            if (readarray[i].seq[j] == 'A' && ( right_lose[j-readarray[i].pos-IDX][0] > 2 || (float)right_array[j-readarray[i].pos-IDX][0]/(float)right_array[j-readarray[i].pos-IDX][5] > 0.25f) ) {
+                            if (readarray[i].seq[j] == 'A' && ( right_lose[j-readarray[i].pos-IDX][0] >= 2 || (float)right_array[j-readarray[i].pos-IDX][0]/(float)right_array[j-readarray[i].pos-IDX][5] > 0.25f) ) {
                                 continue;
                             }
-                            if (readarray[i].seq[j] == 'T' && ( right_lose[j-readarray[i].pos-IDX][1] > 2|| (float)right_array[j-readarray[i].pos-IDX][1]/(float)right_array[j-readarray[i].pos-IDX][5] > 0.25f )) {
+                            if (readarray[i].seq[j] == 'T' && ( right_lose[j-readarray[i].pos-IDX][1] >= 2 || (float)right_array[j-readarray[i].pos-IDX][1]/(float)right_array[j-readarray[i].pos-IDX][5] > 0.25f )) {
                                 continue;
                             }
-                            if (readarray[i].seq[j] == 'C' && ( right_lose[j-readarray[i].pos-IDX][2] > 2 || (float)right_array[j-readarray[i].pos-IDX][2]/(float)right_array[j-readarray[i].pos-IDX][5] > 0.25f )) {
+                            if (readarray[i].seq[j] == 'C' && ( right_lose[j-readarray[i].pos-IDX][2] >= 2 || (float)right_array[j-readarray[i].pos-IDX][2]/(float)right_array[j-readarray[i].pos-IDX][5] > 0.25f )) {
                                 continue;
                             }
-                            if (readarray[i].seq[j] == 'G' && ( right_lose[j-readarray[i].pos-IDX][3] > 2 || (float)right_array[j-readarray[i].pos-IDX][3]/(float)right_array[j-readarray[i].pos-IDX][5] > 0.25f )) {
+                            if (readarray[i].seq[j] == 'G' && ( right_lose[j-readarray[i].pos-IDX][3] >= 2 || (float)right_array[j-readarray[i].pos-IDX][3]/(float)right_array[j-readarray[i].pos-IDX][5] > 0.25f )) {
                                 continue;
                             }
                             //\\

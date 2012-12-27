@@ -773,6 +773,7 @@ public class Node {
         System.out.println("[" + sb.toString()+ "]");
         sb.setCharAt(2, 'A');
         System.out.println(sb.toString());
+        
         //System.out.println("ATCGATCG".substring(3));
     }
 }

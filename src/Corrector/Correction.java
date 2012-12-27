@@ -241,8 +241,8 @@ public class Correction extends Configured implements Tool
                         reporter.incrCounter("Brush", "fix_char", 1);
                     } else if (array[i][4] < 0 ) {
                         fix_str = fix_str + node.str().charAt(i);
-                        fix_qv = fix_qv + (char)53;
-                        //fix_qv = fix_qv + node.Qscore_1().charAt(i);
+                        //fix_qv = fix_qv + (char)53;
+                        fix_qv = fix_qv + node.Qscore_1().charAt(i);
                     } else {
                         fix_str = fix_str + node.str().charAt(i);
                         fix_qv = fix_qv + node.Qscore_1().charAt(i);

@@ -4,6 +4,11 @@ More details about ReadStac you can get under: https://github.com/ice91/ReadStac
 
 requirement: hadoop cluster
 
-e.g hadoop fs -put data/Ec10k.sim.sfq Ec10k
+step 1: convert *.fastq to *.sfq
+e.g. java Fastq2Sfq E_coli.fastq E_coli.sfq
 
-hadoop jar ReadStackCorrector.jar -in Ec10k -out Ec10k_ec
+step 2: upload *.sfq to HDFS
+e.g. hadoop fs -put E_coli.sfq E_coli
+
+step 3: exceute the ReadStackCorrector
+e.g. hadoop jar ReadStackCorrector.jar -in Ec10k -out Ec10k_ec

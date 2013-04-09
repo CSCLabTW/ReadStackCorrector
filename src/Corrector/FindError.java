@@ -93,8 +93,8 @@ public class FindError extends Configured implements Tool
                         }
                     }
                 } else if (window_tmp_r.compareTo(window_tmp) < 0) {
-                    String prefix_half_tmp_r = window_tmp_r.substring(0, IDX/3);
-                    String suffix_half_tmp_r = window_tmp_r.substring(IDX/3);
+                    String prefix_half_tmp_r = window_tmp_r.substring(0, 20);
+                    String suffix_half_tmp_r = window_tmp_r.substring(20);
                     String prefix_half_r = Node.str2dna(prefix_half_tmp_r);
                     String suffix_half_r = Node.str2dna(suffix_half_tmp_r);
                     String group_id = prefix_half_r;

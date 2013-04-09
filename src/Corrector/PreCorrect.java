@@ -69,19 +69,46 @@ public class PreCorrect extends Configured implements Tool
             for (int i = 0; i < end; i++)
             {
                 String window_tmp = node.str().substring(i, i+(IDX/2)) + node.str().substring(i+(IDX/2+1), i+(IDX+1));
-                String window_r_tmp = Node.rc(node.str().substring(node.len()-(IDX+1)-i, node.len()-(IDX/2+1)-i) + node.str().substring(node.len()-(IDX/2)-i, node.len()-i));
-                String window = Node.str2dna(window_tmp);
-                String window_r = Node.str2dna(window_r_tmp);
-                int f_pos = i + (IDX/2);
-                int r_pos = node.len()-(IDX/2+1)-i;
+                String window_tmp_r = Node.rc(window_tmp);
+                //\\
+                if (window_tmp.compareTo(window_tmp_r) < 0) {
+                    String prefix_half_tmp = window_tmp.substring(0, IDX/2);
+                    String suffix_half_tmp = window_tmp.substring(IDX/2);
+                    String prefix_half = Node.str2dna(prefix_half_tmp);
+                    String suffix_half = Node.str2dna(suffix_half_tmp);
+                    int f_pos = i + (IDX/2);
+                    if ( !window_tmp.matches("A*") && !window_tmp.matches("T*") ){
+                         output.collect(new Text(prefix_half),
+                                   new Text(node.getNodeId() + "\t" + "f" + "\t" + f_pos + "\t" + node.str().charAt(f_pos) + "\t" + node.Qscore_1().charAt(f_pos) + "\t" + suffix_half + "\t" + node.str().length()));
+                    }
+                } else if (window_tmp_r.compareTo(window_tmp) < 0) {
+                    String prefix_half_tmp_r = window_tmp_r.substring(0, IDX/2);
+                    String suffix_half_tmp_r = window_tmp_r.substring(IDX/2);
+                    String prefix_half_r = Node.str2dna(prefix_half_tmp_r);
+                    String suffix_half_r = Node.str2dna(suffix_half_tmp_r);
+                    int r_pos = end - i + (IDX/2);
+                    String Qscore_reverse = new StringBuffer(node.Qscore_1()).reverse().toString();
+                    if ( !window_tmp_r.matches("A*") && !window_tmp_r.matches("T*") ){
+                         output.collect(new Text(prefix_half_r),
+                                   new Text(node.getNodeId() + "\t" + "r" + "\t" + r_pos + "\t" + Node.rc(node.str()).charAt(r_pos) + "\t" + node.Qscore_1().charAt(r_pos) + "\t" + suffix_half_r + "\t" + node.str().length()));
+                    }
+                }
+                //\\
+                
+                /*int f_pos = i + (IDX/2);
+                
                 if ( !window_tmp.matches("A*") && !window_tmp.matches("T*") && !window_tmp.equals(window_r_tmp)) {
                     output.collect(new Text(window),
                                    new Text(node.getNodeId() + "\t" + "f" + "\t" + f_pos + "\t" + node.str().charAt(f_pos) + "\t" + node.Qscore_1().charAt(f_pos)));
-                }
+                }*/
+                
+                /*String window_r_tmp = Node.rc(node.str().substring(node.len()-(IDX+1)-i, node.len()-(IDX/2+1)-i) + node.str().substring(node.len()-(IDX/2)-i, node.len()-i));
+                String window_r = Node.str2dna(window_r_tmp);
+                int r_pos = node.len()-(IDX/2+1)-i;
                 if (!window_tmp.matches("A*") && !window_tmp.matches("T*") && !window_tmp.equals(window_r_tmp)) {
                     output.collect(new Text(window_r),
                                    new Text(node.getNodeId() + "\t" + "r" + "\t" + r_pos + "\t" + Node.rc(node.str().charAt(r_pos) + "") + "\t" + node.Qscore_1().charAt(r_pos)));
-                }
+                }*/
             }
             
 		}
@@ -103,20 +130,24 @@ public class PreCorrect extends Configured implements Tool
         public class ReadInfo
 		{
 			public String id;
-            public String dir;
-			public int pos;
-            public String base;
-            public char qv;
-            public float cov;
+            public boolean dir;
+			public short pos;
+            public byte base;
+            public byte qv;
+            public short len;
 
-			public ReadInfo(String id1, String dir1, int pos1, String base1, char qv1) throws IOException
+			public ReadInfo(String id1, String dir1, short pos1, String base1, String qv1, short len1) throws IOException
 			{
 				id = id1;
-                dir = dir1;
+                if (dir1.equals("f")) {
+                    dir = true;
+                } else {
+                    dir = false;
+                }
                 pos = pos1;
-                base = base1;
-                qv = qv1;
-                //cov = cov1;
+                base = base1.getBytes()[0];
+                qv = qv1.getBytes()[0];
+                len = len1;
 			}
 
             public String toString()
@@ -125,17 +156,86 @@ public class PreCorrect extends Configured implements Tool
 			}
 		}
         
+        class ReadComparator implements Comparator {
+            public int compare(Object element1, Object element2) {
+                ReadInfo obj1 = (ReadInfo) element1;
+                ReadInfo obj2 = (ReadInfo) element2;
+                if ((int) ( obj1.pos - obj2.pos ) > 0) {
+                    return -1;
+                } else if ((int) ( obj1.pos - obj2.pos ) < 0) {
+                    return 1;
+                } else {
+                    if ( obj1.id.compareTo(obj2.id) < 0) {
+                        return -1;
+                    } else {
+                        return 1;
+                    }
+                }
+            }
+        }
+        
 		public void reduce(Text prefix, Iterator<Text> iter,
 						   OutputCollector<Text, Text> output, Reporter reporter)
 						   throws IOException
 		{
             List<String> corrects_list = new ArrayList<String>();
-			List<ReadInfo> readlist = new ArrayList<ReadInfo>();
-
+			//List<ReadInfo> readlist = new ArrayList<ReadInfo>();
+            List<ReadInfo> readlist;
+            Map<String, List<ReadInfo>> ReadStack_list = new HashMap<String, List<ReadInfo>>();
+            
             int prefix_sum = 0;
             int belong_read = 0;
             int kmer_count = 0;
-            List<String> ReadID_list = new ArrayList<String>();
+            //List<String> ReadID_list = new ArrayList<String>();
+            
+            
+            while(iter.hasNext())
+			{
+				String msg = iter.next().toString();
+				String [] vals = msg.split("\t");
+                ReadInfo read_item = new ReadInfo(vals[0],vals[1],Short.parseShort(vals[2]), vals[3], vals[4], Short.parseShort(vals[6]));
+                //\\
+                String window_tmp = Node.dna2str(prefix.toString()) + Node.dna2str(vals[5]);
+                String window = Node.str2dna(window_tmp);
+                if (ReadStack_list.containsKey(window)) {
+                    readlist = ReadStack_list.get(window);
+                    readlist.add(read_item);
+                    ReadStack_list.put(window, readlist);
+                } else {
+                    readlist = new ArrayList<ReadInfo>();
+                    readlist.add(read_item);
+                    ReadStack_list.put(window, readlist);
+                }   
+			}
+            
+            for(String RS_idx : ReadStack_list.keySet())
+            {// for each readstack 
+            readlist = ReadStack_list.get(RS_idx);   
+            //\\
+            if (readlist.size() <= 5) {
+                continue;
+            }
+            
+            //\\ DEBUG
+            //Collections.sort(readlist, new ReadComparator());
+            //int left_len = readlist.get(0).pos;
+            //\\
+            ReadInfo[] readarray = readlist.toArray(new ReadInfo[readlist.size()]);
+            readlist.clear();
+            
+            //\\\\\\\
+            //\\DEBUG
+            /*output.collect(new Text("MSG"), new Text( "[" + Node.dna2str(RS_idx) + "]" + RS_idx));
+            for(int i=0; i < readarray.length; i++){
+                //\\ DEBUG
+                String start_pos="";
+                for(int j=0; j < (left_len - (readarray[i].pos)); j++) {
+                    start_pos = start_pos + " ";
+                }
+                output.collect(new Text("MSG"), new Text(start_pos + new String(readarray[i].base)+ " " + readarray[i].dir + " " + readarray[i].id + " " + readarray[i].pos));
+            }*/
+            //\\\\\\\ debug
+            //\\\
             
             //\\ 0:A 1:T 2:C 3:G 4:Count
             int[] base_array = new int[5];
@@ -146,110 +246,108 @@ public class PreCorrect extends Configured implements Tool
             boolean lose_T = true;
             boolean lose_C = true;
             boolean lose_G = true;
-            while(iter.hasNext())
-			{
-				String msg = iter.next().toString();
-				String [] vals = msg.split("\t");
-                ReadInfo read_item = new ReadInfo(vals[0],vals[1],Integer.parseInt(vals[2]), vals[3], vals[4].charAt(0));
+            for(int i=0; i < readarray.length; i++) {
+                ReadInfo readitem = readarray[i];
                 base_array[4] = base_array[4] + 1;
-                int quality_value = ((int)read_item.qv-33);
+                int quality_value = ((int)readitem.qv-33);
+                char base_char = (char)readitem.base;
                 if (quality_value < 0 ) {
                     quality_value = 0;
                 } else if (quality_value > 40) {
                     quality_value = 40;
                 }
-                if (read_item.base.equals("A")){
+                if (base_char == 'A'){
                     base_array[0] = base_array[0] + quality_value;
                     if (quality_value >= 20) {
                         lose_A = false;
                     }
-                } else if (read_item.base.equals("T")) {
+                } else if (base_char == 'T') {
                     base_array[1] = base_array[1] + quality_value;
                     if (quality_value >= 20) {
                         lose_T = false;
                     }
-                } else if (read_item.base.equals("C")) {
+                } else if (base_char == 'C') {
                     base_array[2] = base_array[2] + quality_value;
                     if (quality_value >= 20) {
                         lose_C = false;
                     }
-                } else if (read_item.base.equals("G")) {
+                } else if (base_char == 'G') {
                     base_array[3] = base_array[3] + quality_value;
                     if (quality_value >= 20) {
                         lose_G = false;
                     }
                 }
-                readlist.add(read_item);
-			}
-            
-            //\\
-            if (readlist.size() <= 6) {
-                return;
             }
-            //\\\
             
-            String correct_base = "N";
+            char correct_base = 'N';
             int majority = 60;
             int reads_threshold = 6;
             float winner_sum = 0;
             if (base_array[0] > base_array[1] && base_array[0] > base_array[2] && base_array[0] > base_array[3] && base_array[0] >= majority && base_array[4] >= reads_threshold) {
-                correct_base = "A";
+                correct_base = 'A';
                 winner_sum = base_array[0];
             } else if (base_array[1] > base_array[0] && base_array[1] > base_array[2] && base_array[1] > base_array[3] && base_array[1] >= majority && base_array[4] >= reads_threshold) {
-                correct_base = "T";
+                correct_base = 'T';
                 winner_sum = base_array[1];
             } else if (base_array[2] > base_array[0] && base_array[2] > base_array[1] && base_array[2] > base_array[3] && base_array[2] >= majority && base_array[4] >= reads_threshold) {
-                correct_base = "C";
+                correct_base = 'C';
                 winner_sum = base_array[2];
             } else if (base_array[3] > base_array[0] && base_array[3] > base_array[1] && base_array[3] > base_array[2] && base_array[3] >= majority && base_array[4] >= reads_threshold) {
-                correct_base = "G";
+                correct_base = 'G';
                 winner_sum = base_array[3];
             }
             
-            ReadInfo[] readarray = readlist.toArray(new ReadInfo[readlist.size()]);
-            readlist.clear();
-            if (!correct_base.equals("N") ) {
+            if (correct_base != 'N') {
                 boolean fix = true;
                 for(int i=0; i < readarray.length; i++) {
-                    if (!readarray[i].base.equals(correct_base)) {
+                    ReadInfo readitem = readarray[i];
+                    if ((char)readitem.base != correct_base) {
                         //\\
-                        if (readarray[i].base.equals("A") && ((float)base_array[0]/winner_sum > 0.25f || !lose_A )){
+                        if ((char)readitem.base == 'A' && ((float)base_array[0]/winner_sum > 0.25f /*|| !lose_A*/ )){
                             fix = false;
                             //continue;
                         }
-                        if (readarray[i].base.equals("T") && ((float)base_array[1]/winner_sum > 0.25f || !lose_T )){
+                        if ((char)readitem.base == 'T' && ((float)base_array[1]/winner_sum > 0.25f /*|| !lose_T*/ )){
                             fix = false;
                             //continue;
                         }
-                        if (readarray[i].base.equals("C") && ((float)base_array[2]/winner_sum > 0.25f || !lose_C )){
+                        if ((char)readitem.base == 'C' && ((float)base_array[2]/winner_sum > 0.25f /*|| !lose_C*/ )){
                             fix = false;
                             //continue;
                         }
-                        if (readarray[i].base.equals("G") && ((float)base_array[3]/winner_sum > 0.25f || !lose_G )){
+                        if ((char)readitem.base == 'G' && ((float)base_array[3]/winner_sum > 0.25f /*|| !lose_G*/ )){
                             fix = false;
                             //continue;
                         }
                         //\\
-                        if (readarray[i].dir.equals("f") && fix) {
-                            String correct_msg =readarray[i].id + "," + readarray[i].pos + "," + correct_base;
+                        if (readitem.dir && fix) {
+                            String correct_msg =readitem.id + "," + readitem.pos + "," + correct_base;
                             if (!corrects_list.contains(correct_msg)){
                                 corrects_list.add(correct_msg);
                             }
+                            //\\
+                            //output.collect(new Text("COR"), new Text(correct_msg));
+                            //\\
                             reporter.incrCounter("Brush", "fix_char", 1);
                         } 
-                        if (readarray[i].dir.equals("r") && fix) {
-                            String correct_msg = readarray[i].id + "," + readarray[i].pos + "," + Node.rc(correct_base);
+                        if (!readitem.dir && fix) {
+                            int pos = readitem.len-1-readitem.pos;
+                            String correct_msg = readitem.id + "," + pos + "," + Node.rc(correct_base+"");
                             if (!corrects_list.contains(correct_msg)){
                                 corrects_list.add(correct_msg);
+                                //\\
+                                //output.collect(new Text("COR"), new Text(correct_msg));
+                                //\\
                                 reporter.incrCounter("Brush", "fix_char", 1);
                             } 
                         }
                     }
                 }
             }
+            } //for each read stack
             // replace close() function
             // create fake node to pass message
-            Node node = new Node(readarray[0].id);
+            Node node = new Node("MSG");
             node.setstr_raw("X");
             node.setCoverage(1);
             
@@ -259,7 +357,9 @@ public class PreCorrect extends Configured implements Tool
                 String id = vals[0];
                 String msg = vals[1] + "," + vals[2];
                 if (out_list.containsKey(id)){
-                    out_list.get(id).add(msg);
+                    List<String> tmp_corrects = out_list.get(id);
+                    tmp_corrects.add(msg);
+                    out_list.put(id, tmp_corrects);
                 } else {
                     List<String> tmp_corrects = new ArrayList<String>();
                     tmp_corrects.add(msg);
@@ -279,11 +379,12 @@ public class PreCorrect extends Configured implements Tool
                         msgs = msgs + "!" + correct_msg.get(i);
                     }
                 } 
-                node.addCorrections(read_id, msgs);
+                output.collect(new Text(read_id), new Text(msgs));
+                //node.addCorrections(read_id, msgs);
             }
-            if (corrects_list.size() > 0 ) {
+            /*if (corrects_list.size() > 0 ) {
                 output.collect(new Text(node.getNodeId()), new Text(node.toNodeMsg()));
-            }
+            }*/
 		}
 	}
 

@@ -79,33 +79,18 @@ public class Correction extends Configured implements Tool
 
                     node.clearCnfirmations();
                 }
-                /*List<String> corrections = node.getCorrections();
-                if (corrections != null)
-                {
-                    for(String correction : corrections)
-                    {
-                        String [] vals = correction.split("\\|");
-                        String id    = vals[0];
-                        String correct_msg   = vals[1];
-
-                        output.collect(new Text(id),
-                                       new Text(Node.CORRECTMSG + "\t" + correct_msg));
-
-                    }
-
-                    node.clearCorrections();
-                }   */
             } else {
                 output.collect(new Text(node.getNodeId()), new Text(node.toNodeMsg()));
             }
             /*String vals[] = nodetxt.toString().split("\t");
-            if (vals[1].equals(Node.NODEMSG)){
+            if (vals[1].equals(Node.NODEMSG) && vals.length > 2){
                node.fromNodeMsg(nodetxt.toString());
                output.collect(new Text(node.getNodeId()), new Text(node.toNodeMsg()));
-            } else if (vals[1].equals(Node.UPDATEMSG)) { 
-              output.collect(new Text(vals[0]), new Text(vals[1] + "\t" + vals[2]));
+              //} else if (vals[1].equals(Node.UPDATEMSG)) { 
+              //output.collect(new Text(vals[0]), new Text(vals[1] + "\t" + vals[2]));
             } else {
-               output.collect(new Text(vals[0]), new Text(Node.CORRECTMSG + "\t" + vals[1]));
+               output.collect(new Text(vals[0]), new Text(Node.UPDATEMSG + "\t" + vals[1]));
+               //output.collect(new Text(vals[0]), new Text( vals[1] + "\t" + vals[2]));
             }*/
 			reporter.incrCounter("Brush", "nodes", 1);
 		}
@@ -126,8 +111,8 @@ public class Correction extends Configured implements Tool
         public class Correct
         {
             public char chr;
-            public int pos;
-            public Correct(int pos1, char chr1) throws IOException
+            public short pos;
+            public Correct(short pos1, char chr1) throws IOException
             {
                 pos = pos1;
                 chr = chr1;
@@ -170,7 +155,7 @@ public class Correction extends Configured implements Tool
                         if (code_msg[i] == 'N') {
                             confirms.add(i+"");
                         } else if (code_msg[i] == 'A' || code_msg[i] == 'T'|| code_msg[i] == 'C'|| code_msg[i] == 'G' ){
-                            corrects.add(new Correct(i, code_msg[i]));
+                            corrects.add(new Correct((short)i, code_msg[i]));
                         }
                     }
                     //confirms.addAll(confirm.pos);

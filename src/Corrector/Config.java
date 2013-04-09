@@ -31,8 +31,8 @@ public class Config {
 	public static String localBasePath = "work";
 
 	// hadoop options
-	public static int    HADOOP_MAPPERS    = 10;
-	public static int    HADOOP_REDUCERS   = 10;
+	public static int    HADOOP_MAPPERS    = 40;
+	public static int    HADOOP_REDUCERS   = 40;
 	public static int    HADOOP_LOCALNODES = 1000;
 	public static long   HADOOP_TIMEOUT    = 0;
 	public static String HADOOP_JAVAOPTS   = "-Xmx4000m";

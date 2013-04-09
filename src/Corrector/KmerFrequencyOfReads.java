@@ -69,15 +69,21 @@ public class KmerFrequencyOfReads extends Configured implements Tool
                 for (int i = 0; i < end; i++)
                 {
                     String window_tmp = node.str().substring(i,   i+K);
-                    String window_r_tmp = Node.rc(node.str().substring(node.len() - K - i, node.len() - i));
-                    //String window_r_tmp = Node.rc(window_tmp);
-                    String window = Node.str2dna(window_tmp);
+                    //String window_r_tmp = Node.rc(node.str().substring(node.len() - K - i, node.len() - i));
+                    String window_tmp_r = Node.rc(window_tmp);
+                    if (window_tmp.compareTo(window_tmp_r) < 0) {
+                        String window = Node.str2dna(window_tmp);
+                        output.collect(new Text(window), new Text((int)node.cov() + "|" + node.getNodeId()));
+                    } else {
+                        String window_r = Node.str2dna(window_tmp_r);
+                        output.collect(new Text(window_r), new Text((int)node.cov() + "|" + node.getNodeId()));
+                    }
+                    //String window_r = Node.str2dna(window_r_tmp);
+                    /*String window = Node.str2dna(window_tmp);
                     String window_r = Node.str2dna(window_r_tmp);
-                    //output.collect(new Text(window), new IntWritable((int)node.cov()));
-                    //output.collect(new Text(window_r), new IntWritable((int)node.cov()));
                     output.collect(new Text(window), new Text((int)node.cov() + "|" + node.getNodeId()));
                     output.collect(new Text(window_r), new Text((int)node.cov() + "|" + node.getNodeId()));
-                    reporter.incrCounter("Brush", "Allkmer", (int)node.cov());
+                    reporter.incrCounter("Brush", "Allkmer", (int)node.cov());*/
                 }
             }
 		}
@@ -101,23 +107,28 @@ public class KmerFrequencyOfReads extends Configured implements Tool
 						   throws IOException
 		{
             int sum =0;
-            int read_count = 0;
+            //int read_count = 0;
             List<String> ReadID_list = new ArrayList<String>();
+            //List<String> ReadID_list;
+            //Map<String, List<String>> idx_ReadID_list = new HashMap<String, List<String>>();
             while(iter.hasNext())
 			{
                 String msg = iter.next().toString();
 				String [] vals = msg.split("\\|");
-                sum += Integer.parseInt(vals[0]);
+                //\\
                 if (ReadID_list.contains(vals[1])){
                     // do nothing
                 } else {
-                    read_count = read_count + 1;
+                    //read_count = read_count + 1;
+                    sum += Integer.parseInt(vals[0]);
                     ReadID_list.add(vals[1]);
+                    
                 }
-                if (ReadID_list.size() > HighKmer ) {
+                if (ReadID_list.size() > 2 ) {
                     return;
                 }
             }
+            
             for(int i=0; i < ReadID_list.size(); i++) {
                 output.collect(new Text(ReadID_list.get(i)), new Text(sum+""));
             }

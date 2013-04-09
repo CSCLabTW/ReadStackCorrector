@@ -61,7 +61,15 @@ public class PCorrection extends Configured implements Tool
 				OutputCollector<Text, Text> output, Reporter reporter)
 		throws IOException
 		{
-            node.fromNodeMsg(nodetxt.toString());
+            String vals[] = nodetxt.toString().split("\t");
+            if (vals[1].equals(Node.NODEMSG)){
+               node.fromNodeMsg(nodetxt.toString());
+               output.collect(new Text(node.getNodeId()), new Text(node.toNodeMsg()));
+            } else {
+               output.collect(new Text(vals[0]), new Text(Node.CORRECTMSG + "\t" + vals[1]));
+            }
+			reporter.incrCounter("Brush", "nodes", 1);
+            /*node.fromNodeMsg(nodetxt.toString());
             if (node.str_raw().equals("X")) {
                 List<String> corrections = node.getCorrections();
                 if (corrections != null)
@@ -81,8 +89,8 @@ public class PCorrection extends Configured implements Tool
                 }   
             } else {
                 output.collect(new Text(node.getNodeId()), new Text(node.toNodeMsg()));
-            }
-			reporter.incrCounter("Brush", "nodes", 1);
+                reporter.incrCounter("Brush", "nodes", 1);
+            }*/
 		}
 	}
 

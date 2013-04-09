@@ -65,28 +65,58 @@ public class FindError extends Configured implements Tool
 		{
             Node node = new Node();
 			node.fromNodeMsg(nodetxt.toString());
-           
+            
+            Map<String, String> group_sub = new HashMap<String, String>();
             //slide the split K-mer windows for each read in both strands
             int end = node.len() - IDX;
             for (int i = 0; i < end; i++)
             {
                 String window_tmp = node.str().substring(i, i+IDX);
-                String window_r_tmp = Node.rc(node.str().substring(node.len()-IDX-i, node.len()-i));
-                String window = Node.str2dna(window_tmp);
-                String window_r = Node.str2dna(window_r_tmp);
-                int f_pos = i;
-                int r_pos = i;
-                if ( !window_tmp.matches("A*") && !window_tmp.matches("T*") && !window_tmp.equals(window_r_tmp) ) {
-                    output.collect(new Text(window),
-                                   new Text(node.getNodeId() + "\t" + "f" + "\t" + f_pos + "\t" + node.str_raw() + "\t" + node.Qscore_1()));
+                //\\
+                String window_tmp_r = Node.rc(node.str().substring(i, i+IDX));
+                if (window_tmp.compareTo(window_tmp_r) < 0) {
+                    String prefix_half_tmp = window_tmp.substring(0, 20);
+                    String suffix_half_tmp = window_tmp.substring(20);
+                    String prefix_half = Node.str2dna(prefix_half_tmp);
+                    String suffix_half = Node.str2dna(suffix_half_tmp);
+                    String group_id = prefix_half;
+                    int f_pos = i;
+                    if ( !window_tmp.matches("A*") && !window_tmp.matches("T*") ){
+                        if (group_sub.containsKey(group_id)) {
+                            // dir, pos, suffix
+                            String sub = group_sub.get(group_id);
+                            sub = sub + "|" + "f" + "!" + f_pos + "!" + suffix_half;
+                            group_sub.put(group_id, sub);
+                        } else {
+                            String sub = "f" + "!" + f_pos + "!" + suffix_half;
+                            group_sub.put(group_id, sub);
+                        }
+                    }
+                } else if (window_tmp_r.compareTo(window_tmp) < 0) {
+                    String prefix_half_tmp_r = window_tmp_r.substring(0, IDX/3);
+                    String suffix_half_tmp_r = window_tmp_r.substring(IDX/3);
+                    String prefix_half_r = Node.str2dna(prefix_half_tmp_r);
+                    String suffix_half_r = Node.str2dna(suffix_half_tmp_r);
+                    String group_id = prefix_half_r;
+                    int r_pos = end - i;
+                    String Qscore_reverse = new StringBuffer(node.Qscore_1()).reverse().toString();
+                    if ( !window_tmp_r.matches("A*") && !window_tmp_r.matches("T*") ){
+                        if (group_sub.containsKey(group_id)) {
+                            String sub = group_sub.get(group_id);
+                            sub = sub + "|" + "r" + "!" + r_pos + "!" + suffix_half_r;
+                            group_sub.put(group_id, sub);
+                        } else {
+                            String sub = "r" + "!" + r_pos + "!" + suffix_half_r;
+                            group_sub.put(group_id, sub);
+                        }
+                    }
                 }
-                String Qscore_reverse = new StringBuffer(node.Qscore_1()).reverse().toString();
-                if (!window_tmp.matches("A*") && !window_tmp.matches("T*") && !window_tmp.equals(window_r_tmp) ) {
-                    output.collect(new Text(window_r),
-                                   new Text(node.getNodeId() + "\t" + "r" + "\t" + r_pos + "\t" + node.str_raw() + "\t" + Qscore_reverse));
-                }
+                //\\
             }
-            
+             for(String id : group_sub.keySet()) {
+                String sub = group_sub.get(id);
+                output.collect(new Text(id), new Text(node.getNodeId() + "\t" + node.str_raw() + "\t" + node.Qscore_1() + "\t" + sub));
+            }
 		}
 	}
 
@@ -104,35 +134,52 @@ public class FindError extends Configured implements Tool
         public class ReadInfo
 		{
 			public String id;
-            public String dir;
-			public int pos;
+            boolean dir;
+			public short pos;
+            //public short len;
             //public String seq;
-            public char[] seq;
+            public byte[] seq;
             //public String qv;
-            public int[] int_qv;
+            public byte[] int_qv;
 
-			public ReadInfo(String id1, String dir1, int pos1, String seq1, String qv1) throws IOException
+			public ReadInfo(String id1, String dir1, short pos1, /*short len1*/String seq1, String qv1) throws IOException
 			{
 				id = id1;
-                dir = dir1;
                 pos = pos1;
-                if (dir.equals("f")) {
-                    seq = Node.dna2str(seq1).toCharArray();                    
+                //len = len1;
+                if (dir1.equals("f")) {
+                    dir = true;
+                    //seq = Node.dna2str(seq1).toCharArray();
+                    seq = Node.dna2str(seq1).getBytes();
+                    int_qv = new byte[qv1.length()];
+                    for(int i=0; i < int_qv.length; i++){
+                        int_qv[i] = (byte)((int)qv1.charAt(i)-33);
+                    }
                 } else {
-                    seq = Node.rc(Node.dna2str(seq1)).toCharArray();
-                }
-                //qv = qv1;
-                int_qv = new int[qv1.length()];
-                for(int i=0; i < int_qv.length; i++){
-                    int_qv[i] = (int)qv1.charAt(i)-33;
+                    dir = false;
+                    //seq = Node.rc(Node.dna2str(seq1)).toCharArray();
+                    seq = Node.rc(Node.dna2str(seq1)).getBytes();
+                    int_qv = new byte[qv1.length()];
+                    for(int i=0; i < int_qv.length; i++){
+                        int_qv[i] = (byte)((int)qv1.charAt(int_qv.length-1-i)-33);
+                    }
                 }
 			}
 
             public String toString()
 			{
-                return id + "!" + dir + "|" + pos + "|" + seq ;   
+                return id + "!" + dir + "|" + pos + "|" /*+ seq*/ ;   
 			}
 		}
+        
+        /*public class SeqInfo {
+            public String seq;
+            public String qv;
+            public SeqInfo(String seq1, String qv1) {
+                seq = seq1;
+                qv = qv1;
+            }
+        }*/
         
         class ReadComparator_right implements Comparator {
             public int compare(Object element1, Object element2) {
@@ -140,7 +187,7 @@ public class FindError extends Configured implements Tool
                 ReadInfo obj2 = (ReadInfo) element2;
                 if ((int) ( (obj1.seq.length- obj1.pos) - (obj2.seq.length - obj2.pos) ) > 0) {
                     return -1;
-                } else if ((int) ( (obj1.seq.length- obj1.pos) - (obj2.seq.length - obj2.pos) ) < 0) {
+                } else if ((int) ( (obj1.seq.length - obj1.pos) - (obj2.seq.length - obj2.pos) ) < 0) {
                     return 1;
                 } else {
                     if ( obj1.id.compareTo(obj2.id) < 0) {
@@ -175,24 +222,90 @@ public class FindError extends Configured implements Tool
 						   throws IOException
 		{
             List<String> code_list = new ArrayList<String>();
-			List<ReadInfo> readlist = new ArrayList<ReadInfo>();
-            List<String> ReadID_list = new ArrayList<String>();
+			List<ReadInfo> readlist;
+            //List<String> ReadID_list = new ArrayList<String>();
+            Map<String, List<ReadInfo>> ReadStack_list = new HashMap<String, List<ReadInfo>>();
+            //Map<String, String> id_seq = new HashMap<String, String>();
+            //Map<String, String> id_qv = new HashMap<String, String>();
+            //Map<String, SeqInfo> id_seq = new HashMap<String, SeqInfo>();
+            List<String> H_Kmer = new ArrayList<String>();
             
             while(iter.hasNext())
 			{
 				String msg = iter.next().toString();
 				String [] vals = msg.split("\t");
-                ReadInfo read_item = new ReadInfo(vals[0],vals[1],Integer.parseInt(vals[2]), vals[3], vals[4]);
-                readlist.add(read_item);
-                if (readlist.size() > HighKmer) {
-                    //break;
-                    return;
+                String id = vals[0];
+                String seq = vals[1];
+                String qv = vals[2];
+                String [] subs = vals[3].split("\\|");
+                for(int i=0; i < subs.length; i++) {
+                    String [] sub = subs[i].split("!");
+                    String dir = sub[0];
+                    String pos = sub[1];
+                    String suffix = sub[2];
+                    /*String DNAseq = Node.dna2str(seq);
+                    String DNAqv = qv;
+                    if (!id_seq.containsKey(id)) {
+                        id_seq.put(id, new SeqInfo(DNAseq, DNAqv));
+                    }*/
+                    ReadInfo read_item = new ReadInfo(id,dir,Short.parseShort(pos), seq, qv);
+                    //ReadInfo read_item = new ReadInfo(id,dir,Short.parseShort(pos), (short)DNAseq.length());
+                    String window_tmp = Node.dna2str(prefix.toString()) + Node.dna2str(suffix);
+                    String window = Node.str2dna(window_tmp);
+                    if (!H_Kmer.contains(window)) {
+                        if (ReadStack_list.containsKey(window)) {
+                            readlist = ReadStack_list.get(window);
+                            if (readlist.size()+1 > HighKmer) {
+                                H_Kmer.add(window);
+                                ReadStack_list.remove(window);
+                            } else {
+                                readlist.add(read_item);
+                                ReadStack_list.put(window, readlist);
+                            }
+                        } else {
+                            readlist = new ArrayList<ReadInfo>();
+                            readlist.add(read_item);
+                            ReadStack_list.put(window, readlist);
+                        }
+                    }
                 }
+                // duplicate reverse complement reads
+                /*String window_r_tmp = Node.rc(window_tmp);
+                String window_r = Node.str2dna(window_r_tmp);
+                int end = Node.dna2str(vals[3]).length() - IDX;
+                String Qscore_reverse = new StringBuffer(vals[4]).reverse().toString();
+                read_item = new ReadInfo(vals[0], Node.flip_dir(vals[1]), end - Integer.parseInt(vals[2]), Node.str2dna(Node.dna2str(vals[3])), Qscore_reverse);
+                if (!H_Kmer.contains(window_r)){
+                    if (ReadStack_list.containsKey(window_r)) {
+                        readlist = ReadStack_list.get(window_r);
+                        if (readlist.size()+1 > HighKmer) {
+                            H_Kmer.add(window_r);
+                            ReadStack_list.remove(window_r);
+                        } else {
+                            readlist.add(read_item);
+                            ReadStack_list.put(window_r, readlist);
+                        }
+                    } else {
+                        readlist = new ArrayList<ReadInfo>();
+                        readlist.add(read_item);
+                        ReadStack_list.put(window_r, readlist);
+                    }
+                }*/
 			}
             
+            // for all ReadStack
+            Node node = new Node("MSG");
+            node.setstr_raw("X");
+            node.setCoverage(1);   
+            Map<String, StringBuffer> outcode_list = new HashMap<String, StringBuffer>();
+            
+            for(String RS_idx : ReadStack_list.keySet())
+            {// for each readstack
+                
+            readlist = ReadStack_list.get(RS_idx);     
             //\\
             if (readlist.size() <= 5 ) {
-                return;
+                continue;
             }
             //\\\
             
@@ -200,259 +313,176 @@ public class FindError extends Configured implements Tool
             int right_len = readlist.get(0).seq.length - IDX - readlist.get(0).pos;
             Collections.sort(readlist, new ReadComparator());
             int left_len = readlist.get(0).pos;
-            //\\ 0:A 1:T 2:C 3:G 4:Sum 5:max 
-            int[][] left_array = new int[left_len][6];
-            int[][] left_lose = new int[left_len][4];
-            for(int i=0; i < left_len; i++) {
-                for(int j=0; j < 6; j++) {
-                    left_array[i][j] = 0;
-                    if( j < 4) {
-                        left_lose[i][j] = 0;
-                    }
-                } 
-            }
-            //\\
-            int [][] IDX_lose = new int[IDX][4];
-            int [][] IDX_array = new int[IDX][6];
-            for(int i=0; i < IDX; i++) {
-                for(int j=0; j < 6; j++){
-                    IDX_array[i][j] = 0;
-                	if ( j < 4){
-                    	IDX_lose[i][j] = 0;
-                    }
-                }
-            }
-            //\\
-            int[][] right_array = new int[right_len][6];
-            int[][] right_lose = new int[right_len][4];
-            for(int i=0; i < right_len; i++) {
-                for(int j=0; j < 6; j++) {
-                    right_array[i][j] = 0;
-                    if ( j < 4) {
-                        right_lose[i][j] = 0;
-                    }
-                }
-            }
-            //
             ReadInfo[] readarray = readlist.toArray(new ReadInfo[readlist.size()]);
             readlist.clear();
-            for(int i=0; i < readarray.length; i++){
-                // compute_letf_array
-                for(int j=0; j < readarray[i].pos; j++) {
-                    left_array[left_len - readarray[i].pos + j][4] = left_array[left_len - readarray[i].pos + j][4] + 1;
-                    int quality_value = readarray[i].int_qv[j];
-                    if (quality_value < 0) {
-                        quality_value = 0;
-                    } else if (quality_value > 40) {
-                        quality_value = 40;
-                    }
-                    if (readarray[i].seq[j] == 'A') {
-                        left_array[left_len - readarray[i].pos + j][0] = left_array[left_len - readarray[i].pos + j][0] + quality_value;
-                        if (quality_value >= 20)
-                            left_lose[left_len - readarray[i].pos + j][0] = left_lose[left_len - readarray[i].pos + j][0]+1;
-                    } else if (readarray[i].seq[j] == 'T') {
-                        left_array[left_len - readarray[i].pos + j][1] = left_array[left_len - readarray[i].pos + j][1] + quality_value;
-                        if (quality_value >= 20)
-                            left_lose[left_len - readarray[i].pos + j][1] = left_lose[left_len - readarray[i].pos + j][1]+1;
-                    } else if (readarray[i].seq[j] == 'C') {
-                        left_array[left_len - readarray[i].pos + j][2] = left_array[left_len - readarray[i].pos + j][2] + quality_value;
-                        if (quality_value >= 20)
-                            left_lose[left_len - readarray[i].pos + j][2] = left_lose[left_len - readarray[i].pos + j][2]+1;
-                    } else if (readarray[i].seq[j] == 'G') {
-                        left_array[left_len - readarray[i].pos + j][3] = left_array[left_len - readarray[i].pos + j][3] + quality_value;
-                        if (quality_value >= 20)
-                            left_lose[left_len - readarray[i].pos + j][3] = left_lose[left_len - readarray[i].pos + j][3]+1;
-                    }
-                }
-                //\compute IDX array
-                for(int j=readarray[i].pos; j < readarray[i].pos + IDX; j++) {
-                    int quality_value = (int)readarray[i].int_qv[j];
-                    if (quality_value < 0) {
-                        quality_value = 0;
-                    } else if (quality_value > 40) {
-                        quality_value = 40;
-                    }
-                    IDX_array[j-readarray[i].pos][4] = IDX_array[j-readarray[i].pos][4] + 1;
-                    if (readarray[i].seq[j] == 'A') {
-                        IDX_array[j-readarray[i].pos][0]= IDX_array[j-readarray[i].pos][0] + quality_value;
-                    	if  (quality_value >= 20)
-                            IDX_lose[j-readarray[i].pos][0] = IDX_lose[j-readarray[i].pos][0]+1;
-                    } else if (readarray[i].seq[j] == 'T') { 
-                    	IDX_array[j-readarray[i].pos][1]= IDX_array[j-readarray[i].pos][1] + quality_value;
-                    	if  (quality_value >= 20)
-                            IDX_lose[j-readarray[i].pos][1] = IDX_lose[j-readarray[i].pos][1]+1;
-                    } else if (readarray[i].seq[j] == 'C') { 
-                    	IDX_array[j-readarray[i].pos][2]= IDX_array[j-readarray[i].pos][2] + quality_value;
-                    	if  (quality_value >= 20)
-                            IDX_lose[j-readarray[i].pos][2] = IDX_lose[j-readarray[i].pos][2]+1;
-                    } else if (readarray[i].seq[j] == 'G') {
-                    	IDX_array[j-readarray[i].pos][3]= IDX_array[j-readarray[i].pos][3] + quality_value;
-                    	if  (quality_value >= 20)
-                            IDX_lose[j-readarray[i].pos][3] = IDX_lose[j-readarray[i].pos][3]+1;
-                    }
-                }
-                //\\\
-                // compute_right_array
-                for(int j=readarray[i].pos + IDX; j < readarray[i].seq.length; j++) {
-                    int quality_value = (int)readarray[i].int_qv[j];
-                    if (quality_value < 0) {
-                        quality_value = 0;
-                    } else if (quality_value > 40) {
-                        quality_value = 40;
-                    }
-                    right_array[j-readarray[i].pos-IDX][4] = right_array[j-readarray[i].pos-IDX][4] + 1;
-                    if (readarray[i].seq[j] == 'A') {
-                        right_array[j-readarray[i].pos-IDX][0] = right_array[j-readarray[i].pos-IDX][0] + quality_value;
-                        if  (quality_value >= 20)
-                            right_lose[j-readarray[i].pos-IDX][0] = right_lose[j-readarray[i].pos-IDX][0]+1;
-                    } else if (readarray[i].seq[j] == 'T') { 
-                        right_array[j-readarray[i].pos-IDX][1] = right_array[j-readarray[i].pos-IDX][1] + quality_value;
-                        if  (quality_value >= 20)
-                            right_lose[j-readarray[i].pos-IDX][1] = right_lose[j-readarray[i].pos-IDX][1]+1;
-                    } else if (readarray[i].seq[j] == 'C') { 
-                        right_array[j-readarray[i].pos-IDX][2] = right_array[j-readarray[i].pos-IDX][2] + quality_value;
-                        if  (quality_value >= 20)
-                            right_lose[j-readarray[i].pos-IDX][2] = right_lose[j-readarray[i].pos-IDX][2]+1;
-                    } else if (readarray[i].seq[j] == 'G') {
-                        right_array[j-readarray[i].pos-IDX][3] = right_array[j-readarray[i].pos-IDX][3] + quality_value;
-                        if  (quality_value >= 20)
-                            right_lose[j-readarray[i].pos-IDX][3] = right_lose[j-readarray[i].pos-IDX][3]+1;
-                    }
-                }        
-            }
             
+            //\\\\\\\
+            //\\DEBUG
+            /*output.collect(new Text(node.getNodeId()), new Text( "[" + Node.dna2str(RS_idx) + "]" + RS_idx));
+            for(int i=0; i < readarray.length; i++){
+                //\\ DEBUG
+                String start_pos="";
+                for(int j=0; j < (left_len - readarray[i].pos); j++) {
+                    start_pos = start_pos + " ";
+                }
+                output.collect(new Text(node.getNodeId()), new Text(start_pos + new String(readarray[i].seq)+ " " + readarray[i].dir + " " + readarray[i].id));
+            }*/
+            //\\\\\\\ debug
+            //--- for each column
+            
+            int[] array = new int[6];
+            int[] lose = new int[4];
+            
+            //\\
+            //String debug = "";
+            //\\            
+            //  left range
             int majority = 2;
-            int reads_threshold = 6;
-            // compute left consensus
-            String left_consensus = "";
-            int left_branch=-1;
-            for(int i=0; i < left_array.length; i++){
-                if ( left_array[i][0] > left_array[i][1] && left_array[i][0] > left_array[i][2] && left_array[i][0] > left_array[i][3] /*&& left_lose[i][0] >= majority && left_array[i][4] >= reads_threshold*/) {
-                    left_consensus = left_consensus + "A";
-                    left_array[i][5] = left_array[i][0];
-                } else if (left_array[i][1] > left_array[i][0] && left_array[i][1] > left_array[i][2] && left_array[i][1] > left_array[i][3] /*&& left_lose[i][1] >= majority && left_array[i][4] >= reads_threshold*/) {
-                    left_consensus = left_consensus + "T";
-                    left_array[i][5] = left_array[i][1];
-                } else if (left_array[i][2] > left_array[i][0] && left_array[i][2] > left_array[i][1] && left_array[i][2] > left_array[i][3] /*&& left_lose[i][2] >= majority && left_array[i][4] >= reads_threshold*/) {
-                    left_consensus = left_consensus + "C";
-                    left_array[i][5] = left_array[i][2];
-                } else if (left_array[i][3] > left_array[i][0] && left_array[i][3] > left_array[i][1] && left_array[i][3] > left_array[i][2] /*&& left_lose[i][3] >= majority && left_array[i][4] >= reads_threshold*/) {
-                    left_consensus = left_consensus + "G";
-                    left_array[i][5] = left_array[i][3];
+            int reads_threshold = 6;    
+            for(int j=left_len - 1; j >= 0; j--) {
+                char consensus = 'N';
+                for(int k=0; k < 6; k++) {
+                    array[k] = 0;
+                    if( k < 4) {
+                        lose[k] = 0;
+                    }
+                } 
+                //\\
+                //debug = "";
+                //\\
+                for(int i=0; i < readarray.length; i++) {
+                    ReadInfo readitem = readarray[i];
+                    if (readitem.pos-left_len+j < 0) {
+                        //debug = debug + " ";
+                        continue;
+                    }
+                    array[4] = array[4] + 1;
+                    int quality_value = readitem.int_qv[readitem.pos-left_len+j];
+                    char base_char = (char)readitem.seq[readitem.pos-left_len+j];
+                    /*int quality_value;
+                    char base_char;
+                    if (readarray[i].dir) {
+                        quality_value = (int)id_seq.get(readarray[i].id).qv.charAt(readarray[i].pos-left_len+j) - 33;
+                        base_char = id_seq.get(readarray[i].id).seq.charAt(readarray[i].pos-left_len+j);
+                    } else {
+                        String qv_reverse = new StringBuffer(id_seq.get(readarray[i].id).qv).reverse().toString();
+                        quality_value = (int)qv_reverse.charAt(readarray[i].pos-left_len+j) -33;
+                        base_char = Node.rc(id_seq.get(readarray[i].id).seq).charAt(readarray[i].pos-left_len+j);
+                    }*/
+                    if (quality_value < 0) {
+                        quality_value = 0;
+                    } else if (quality_value > 40) {
+                        quality_value = 40;
+                    }
+                    if (base_char == 'A') {
+                        array[0] = array[0] + quality_value;
+                        if (quality_value >= 20)
+                            lose[0] = lose[0]+1;
+                    } else if (base_char == 'T') {
+                        array[1] = array[1] + quality_value;
+                        if (quality_value >= 20)
+                            lose[1] = lose[1]+1;
+                    } else if (base_char == 'C') {
+                        array[2] = array[2] + quality_value;
+                        if (quality_value >= 20)
+                            lose[2] = lose[2]+1;
+                    } else if (base_char == 'G') {
+                        array[3] = array[3] + quality_value;
+                        if (quality_value >= 20)
+                            lose[3] = lose[3]+1;
+                    }
+                    //\\
+                    //debug = debug + base_char;
+                    //\\
+                }
+                //\\
+                //output.collect(new Text(node.getNodeId()), new Text("{" + debug + "}"));
+                //\\
+                if ( array[0] > array[1] && array[0] > array[2] && array[0] > array[3]) {
+                    consensus = 'A';
+                    array[5] = array[0];
+                } else if (array[1] > array[0] && array[1] > array[2] && array[1] > array[3]) {
+                    consensus = 'T';
+                    array[5] = array[1];
+                } else if (array[2] > array[0] && array[2] > array[1] && array[2] > array[3]) {
+                    consensus = 'C';
+                    array[5] = array[2];
+                } else if (array[3] > array[0] && array[3] > array[1] && array[3] > array[2]) {
+                    consensus = 'G';
+                    array[5] = array[3];
                 } else {
-                    left_consensus = left_consensus + "N";
-                    left_array[i][5] = left_array[i][0];
+                    consensus = 'N';
+                    array[5] = array[0];
                 }
-                //\\ apply branch
                 int support = 0;
-                if (left_lose[i][0] >= majority ){
+                if (lose[0] >= majority ){
                 	support = support +1;
                 }
-                if (left_lose[i][1] >= majority ){
+                if (lose[1] >= majority ){
                 	support = support +1;
                 }
-                if (left_lose[i][2] >= majority ){
+                if (lose[2] >= majority ){
                 	support = support +1;
                 }
-                if (left_lose[i][3] >= majority ){
+                if (lose[3] >= majority ){
                 	support = support +1;
                 }
-                if (support >=2){
-                	left_branch =i;
+                if (support >= 2 || array[4] < reads_threshold) {
+                    break; //branch
                 }
-            }
-            //\\ apply branch, using N to replace char before left_branch point
-            String left_branch_str="";
-            if (left_branch >= 0) {
-            	left_branch = left_branch -1; //exclude branch point
-            }
-            for (int i=0; i<= left_branch;i++) {
-            	left_branch_str = left_branch_str+ "N";
-            }
-            left_consensus = left_branch_str + left_consensus.substring(left_branch_str.length());
-            //\\\\\\\\\
-            // compute right consensus
-            String right_consensus = "";
-            int right_branch=-1;
-            for(int i=0; i < right_array.length; i++){
-                if (right_array[i][0] > right_array[i][1] && right_array[i][0] > right_array[i][2] && right_array[i][0] > right_array[i][3] /*&& right_lose[i][0] >= majority && right_array[i][4] >= reads_threshold*/) {
-                    right_consensus = right_consensus + "A";
-                    right_array[i][5] = right_array[i][0];
-                } else if (right_array[i][1] > right_array[i][0] && right_array[i][1] > right_array[i][2] && right_array[i][1] > right_array[i][3] /*&& right_lose[i][1] >= majority && right_array[i][4] >= reads_threshold*/) {
-                    right_consensus = right_consensus + "T";
-                    right_array[i][5] = right_array[i][1];
-                } else if (right_array[i][2] > right_array[i][0] && right_array[i][2] > right_array[i][1] && right_array[i][2] > right_array[i][3] /*&& right_lose[i][2] >= majority && right_array[i][4] >= reads_threshold*/) {
-                    right_consensus = right_consensus + "C";
-                    right_array[i][5] = right_array[i][2];
-                } else if (right_array[i][3] > right_array[i][0] && right_array[i][3] > right_array[i][1] && right_array[i][3] > right_array[i][2] /*&& right_lose[i][3] >= majority && right_array[i][4] >= reads_threshold*/) {
-                    right_consensus = right_consensus + "G";
-                    right_array[i][5] = right_array[i][3];
-                } else {
-                    right_consensus = right_consensus + "N";
-                    right_array[i][5] = right_array[i][0];
-                }
-              //\\ apply branch
-                int support = 0;
-                if (right_lose[i][0] >= majority ){
-                	support = support +1;
-                }
-                if (right_lose[i][1] >= majority ){
-                	support = support +1;
-                }
-                if (right_lose[i][2] >= majority ){
-                	support = support +1;
-                }
-                if (right_lose[i][3] >= majority ){
-                	support = support +1;
-                }
-                if (support >=2 && right_branch < 0){
-                	right_branch =i;
-                }
-            }
-            //\\ apply branch, using N to replace char after right_branch point
-            if (right_branch >= 0) {
-	            String right_branch_str="";
-	            for (int i=0; i< right_consensus.length()-(right_branch+1);i++) {
-	            	right_branch_str = right_branch_str+ "N";
-	            }
-	            right_consensus = right_consensus.substring(0,right_branch+1)+right_branch_str;
-            }
-            
-            Node node = new Node(readarray[0].id);
-            node.setstr_raw("X");
-            node.setCoverage(1);   
-            Map<String, StringBuffer> outcode_list = new HashMap<String, StringBuffer>();
-            for(int i=0; i < readarray.length; i++){
-                // left array
-                for(int j=0; j < readarray[i].pos; j++) {
-                    String id = readarray[i].id;
+                for(int i=0; i < readarray.length; i++) {
+                    ReadInfo readitem = readarray[i];
+                    if (readitem.pos-left_len+j < 0) {
+                        continue;
+                    }
+                    String id = readitem.id;
+                    /*int quality_value;
+                    int quality_value_r;
+                    char base_char;
+                    if (readarray[i].dir) {
+                        quality_value = (int)id_seq.get(readarray[i].id).qv.charAt(readarray[i].pos-left_len+j) - 33;
+                        quality_value_r = (int)id_seq.get(readarray[i].id).qv.charAt(readarray[i].len-1-(readarray[i].pos-left_len+j)) - 33;
+                        base_char = id_seq.get(readarray[i].id).seq.charAt(readarray[i].pos-left_len+j);
+                    } else {
+                        String qv_reverse = new StringBuffer(id_seq.get(readarray[i].id).qv).reverse().toString();
+                        quality_value = (int)qv_reverse.charAt(readarray[i].pos-left_len+j) -33;
+                        quality_value_r = (int)qv_reverse.charAt(readarray[i].len-1-(readarray[i].pos-left_len+j)) -33;
+                        base_char = Node.rc(id_seq.get(readarray[i].id).seq).charAt(readarray[i].pos-left_len+j);
+                    }*/
+                    int quality_value = readitem.int_qv[readitem.pos-left_len+j];
+                    int quality_value_r = readitem.int_qv[readitem.seq.length-1-(readitem.pos-left_len+j)];
+                    char base_char = (char)readitem.seq[readitem.pos-left_len+j];
                     int pos = 0;
                     char chr = 'X';
-                    if (left_consensus.charAt(left_len - readarray[i].pos + j) == readarray[i].seq[j]) {
+                    
+                    if (consensus == base_char) {
                         // Comfirmation
                         boolean confirm = false;
-                        if (left_lose[left_len - readarray[i].pos + j][0] >= 3 && readarray[i].seq[j] == 'A' && (left_lose[left_len - readarray[i].pos + j][1] < 2 && left_lose[left_len - readarray[i].pos + j][2] < 2 && left_lose[left_len - readarray[i].pos + j][3] < 2)) {
+                        if (lose[0] >= 2 && base_char == 'A' && (lose[1] < 2 && lose[2] < 2 && lose[3] < 2)) {
                             confirm = true;
                         }
-                        if (left_lose[left_len - readarray[i].pos + j][1] >= 3 && readarray[i].seq[j] == 'T' && (left_lose[left_len - readarray[i].pos + j][0] < 2 && left_lose[left_len - readarray[i].pos + j][2] < 2 && left_lose[left_len - readarray[i].pos + j][3] < 2)) {
+                        if (lose[1] >= 2 && base_char == 'T' && (lose[0] < 2 && lose[2] < 2 && lose[3] < 2)) {
                             confirm = true;
                         }
-                        if (left_lose[left_len - readarray[i].pos + j][2] >= 3 && readarray[i].seq[j] == 'C' && (left_lose[left_len - readarray[i].pos + j][0] < 2 && left_lose[left_len - readarray[i].pos + j][1] < 2 && left_lose[left_len - readarray[i].pos + j][3] < 2)) {
+                        if (lose[2] >= 2 && base_char == 'C' && (lose[0] < 2 && lose[1] < 2 && lose[3] < 2)) {
                             confirm = true;
                         }
-                        if (left_lose[left_len - readarray[i].pos + j][3] >= 3 && readarray[i].seq[j] == 'G' && (left_lose[left_len - readarray[i].pos + j][0] < 2 && left_lose[left_len - readarray[i].pos + j][1] < 2 && left_lose[left_len - readarray[i].pos + j][2] < 2)) {
+                        if (lose[3] >= 2 && base_char == 'G' && (lose[0] < 2 && lose[1] < 2 && lose[2] < 2)) {
                             confirm = true;
                         }
                         if (confirm ) {
                             boolean submit = true;
-                            if (readarray[i].dir.equals("f") && readarray[i].int_qv[j] < 20){
-                                pos = j;
-                            } else if (readarray[i].dir.equals("r") && (int)readarray[i].int_qv[readarray[i].seq.length-1-j] < 20) {
-                                pos = (readarray[i].seq.length-1-j);
+                            if (readitem.dir && quality_value < 20){
+                                pos = readitem.pos-left_len+j;
+                            } else if (!readitem.dir && quality_value_r < 20) {
+                                pos = (readitem.seq.length-1-(readitem.pos-left_len+j));
                             } else {
                                 submit = false;
                             }
                             if (submit) {
+                                //\\
+                                //output.collect(new Text(id), new Text(pos+":LC"));
+                                //\\
                                 if (outcode_list.containsKey(id)){
                                     StringBuffer sb = outcode_list.get(id);
                                     if (pos >= sb.length()){
@@ -478,28 +508,47 @@ public class FindError extends Configured implements Tool
                         }
                         //\\\\
                     } else {
-                        if (!(left_consensus.charAt(left_len - readarray[i].pos + j) == 'N')) {
+                        if (consensus != 'N') {
+                            //\\\
+                            float A_ratio = (float)array[0]/(float)array[5];
+                            float T_ratio = (float)array[1]/(float)array[5];
+                            float C_ratio = (float)array[2]/(float)array[5];
+                            float G_ratio = (float)array[3]/(float)array[5];
+                            if (consensus == 'A' && (T_ratio > 0.25 || C_ratio > 0.25 || G_ratio > 0.25)) {
+                                break;
+                            }
+                            if (consensus == 'T' && (A_ratio > 0.25 || C_ratio > 0.25 || G_ratio > 0.25)) {
+                                break;
+                            }
+                            if (consensus == 'C' && (A_ratio > 0.25 || T_ratio > 0.25 || G_ratio > 0.25)) {
+                                break;
+                            }
+                            if (consensus == 'C' && (A_ratio > 0.25 || T_ratio > 0.25 || C_ratio > 0.25)) {
+                                break;
+                            }
                             //\\
-                            if(readarray[i].seq[j] == 'A' && ( left_lose[left_len - readarray[i].pos + j][0] >= 2 || (float)left_array[left_len - readarray[i].pos + j][0]/(float)left_array[left_len - readarray[i].pos + j][5] > 0.25f)) {
-                                continue;
+                            if( base_char == 'A' && ( lose[0] >= 2 || (float)array[0]/(float)array[5] > 0.25f)) {
+                                break;
                             }
-                            if(readarray[i].seq[j] == 'T' && ( left_lose[left_len - readarray[i].pos + j][1] >= 2 || (float)left_array[left_len - readarray[i].pos + j][1]/(float)left_array[left_len - readarray[i].pos + j][5] > 0.25f)) {
-                                continue;
+                            if( base_char == 'T' && ( lose[1] >= 2 || (float)array[1]/(float)array[5] > 0.25f)) {
+                                break;
                             }
-                            if(readarray[i].seq[j] == 'C' && ( left_lose[left_len - readarray[i].pos + j][2] >= 2 || (float)left_array[left_len - readarray[i].pos + j][2]/(float)left_array[left_len - readarray[i].pos + j][5] > 0.25f)) {
-                                continue;
+                            if( base_char == 'C' && ( lose[2] >= 2 || (float)array[2]/(float)array[5] > 0.25f)) {
+                                break;
                             }
-                            if(readarray[i].seq[j] == 'G' && ( left_lose[left_len - readarray[i].pos + j][3] >= 2 || (float)left_array[left_len - readarray[i].pos + j][3]/(float)left_array[left_len - readarray[i].pos + j][5] > 0.25f)) {
-                                continue;
+                            if( base_char == 'G' && ( lose[3] >= 2 || (float)array[3]/(float)array[5] > 0.25f)) {
+                                break;
                             }
-                            if (readarray[i].dir.equals("f")){
-                                pos = j;
-                                chr = left_consensus.charAt(left_len - readarray[i].pos + j);
-                            } else if (readarray[i].dir.equals("r")) {
-                                pos = readarray[i].seq.length-1-j;
-                                chr = Node.rc(left_consensus.charAt(left_len - readarray[i].pos + j)+"").charAt(0);
+                            if (readitem.dir){
+                                pos = readitem.pos-left_len+j;
+                                chr = consensus;
+                            } else if (!readitem.dir) {
+                                pos = readitem.seq.length-1-(readitem.pos-left_len+j);
+                                chr = Node.rc(consensus+"").charAt(0);
                             }
-                            
+                            //\\
+                            //output.collect(new Text(id), new Text(pos+":L"));
+                            //\\
                             if (outcode_list.containsKey(id)){
                                 StringBuffer sb = outcode_list.get(id);
                                 if (pos >= sb.length()){
@@ -510,7 +559,9 @@ public class FindError extends Configured implements Tool
                                 } else {
                                     if (sb.charAt(pos) == 'X') {
                                         sb.setCharAt(pos, chr);
-                                    } 
+                                    } else if (sb.charAt(pos) != chr) {
+                                        sb.setCharAt(pos, 'N');
+                                    }
                                 }
                                 outcode_list.put(id, sb);
                                 reporter.incrCounter("Brush", "fix_char", 1);
@@ -527,33 +578,109 @@ public class FindError extends Configured implements Tool
                         }
                     }
                 }
-                //\\ IDX array confirmation
-                for(int j=readarray[i].pos; j < readarray[i].pos + IDX; j++) {
-                    String id = readarray[i].id;
+            }
+            // IDX range  
+            for(int j=0; j < IDX; j++) {
+                for(int k=0; k < 6; k++) {
+                    array[k] = 0;
+                    if( k < 4) {
+                        lose[k] = 0;
+                    }
+                } 
+                //\\
+                //debug = "";
+                //\\
+                for(int i=0; i < readarray.length; i++) {
+                    ReadInfo readitem = readarray[i];
+                    /*int quality_value;
+                    char base_char;
+                    if (readarray[i].dir) {
+                        quality_value = (int)id_seq.get(readarray[i].id).qv.charAt(j+readarray[i].pos) - 33;
+                        base_char = id_seq.get(readarray[i].id).seq.charAt(j+readarray[i].pos);
+                    } else {
+                        String qv_reverse = new StringBuffer(id_seq.get(readarray[i].id).qv).reverse().toString();
+                        quality_value = (int)qv_reverse.charAt(j+readarray[i].pos) -33;
+                        base_char = Node.rc(id_seq.get(readarray[i].id).seq).charAt(j+readarray[i].pos);
+                    }*/
+                    int quality_value = (int)readitem.int_qv[j+readitem.pos];
+                    char base_char = (char)readitem.seq[j+readitem.pos];
+                    
+                    if (quality_value < 0) {
+                        quality_value = 0;
+                    } else if (quality_value > 40) {
+                        quality_value = 40;
+                    }
+                    array[4] = array[4]+1;
+                    if (base_char == 'A') {
+                    	array[0] = array[0] + quality_value;
+                        if  (quality_value >= 20)
+                            lose[0] = lose[0]+1;
+                    } else if (base_char == 'T') { 
+                    	array[1]= array[1] + quality_value;
+                    	if  (quality_value >= 20)
+                            lose[1] = lose[1]+1;
+                    } else if (base_char == 'C') { 
+                    	array[2]= array[2] + quality_value;
+                    	if  (quality_value >= 20)
+                            lose[2] = lose[2]+1;
+                    } else if (base_char == 'G') {
+                    	array[3]= array[3] + quality_value;
+                    	if  (quality_value >= 20)
+                            lose[3] = lose[3]+1;
+                    }
+                    //\\
+                    //debug = debug + base_char;
+                    //\\
+                }
+                //\\
+                //output.collect(new Text(node.getNodeId()), new Text("[" + debug + "]"));
+                //\\
+                for(int i=0; i < readarray.length; i++) {
+                    ReadInfo readitem = readarray[i];
+                    String id = readitem.id;
+                    /*int quality_value;
+                    int quality_value_r;
+                    char base_char;
+                    if (readarray[i].dir) {
+                        quality_value = (int)id_seq.get(readarray[i].id).qv.charAt(j+readarray[i].pos) - 33;
+                        quality_value_r = (int)id_seq.get(readarray[i].id).qv.charAt(readarray[i].len-1-(j+readarray[i].pos)) - 33;
+                        base_char = id_seq.get(readarray[i].id).seq.charAt(j+readarray[i].pos);
+                    } else {
+                        String qv_reverse = new StringBuffer(id_seq.get(readarray[i].id).qv).reverse().toString();
+                        quality_value = (int)qv_reverse.charAt(j+readarray[i].pos) -33;
+                        quality_value_r = (int)qv_reverse.charAt(readarray[i].len-1-(j+readarray[i].pos)) -33;
+                        base_char = Node.rc(id_seq.get(readarray[i].id).seq).charAt(j+readarray[i].pos);
+                    }*/
+                    char base_char = (char)readitem.seq[j+readitem.pos];
+                    int quality_value = readitem.int_qv[j+readitem.pos];
+                    int quality_value_r = readitem.int_qv[readitem.seq.length-1-(j+readitem.pos)];
                     int pos = 0;
                     boolean confirm = false;
-                    if (readarray[i].seq[j] == 'A' && IDX_lose[j-readarray[i].pos][0] >= 3 ) {
+                    if (base_char == 'A' && lose[0] >= 2 ) {
                         confirm = true;
                     }
-                    if (readarray[i].seq[j] == 'T' && IDX_lose[j-readarray[i].pos][1] >= 3 ) {
+                    if (base_char== 'T' && lose[1] >= 2 ) {
                         confirm = true;
                     }
-                    if (readarray[i].seq[j] == 'C' && IDX_lose[j-readarray[i].pos][2] >= 3 ) {
+                    if (base_char == 'C' && lose[2] >= 2 ) {
                         confirm = true;
                     }
-                    if (readarray[i].seq[j] == 'G' && IDX_lose[j-readarray[i].pos][3] >= 3 ) {
+                    if (base_char == 'G' && lose[3] >= 2 ) {
                         confirm = true;
                     }
                     if (confirm ) {
                         boolean submit=true;
-                        if (readarray[i].dir.equals("f") && readarray[i].int_qv[j]< 20){
-                            pos = j;
-                        } else if (readarray[i].dir.equals("r") && readarray[i].int_qv[readarray[i].seq.length-1-j] < 20) {
-                            pos = (readarray[i].seq.length-1-j);
+                        if (readitem.dir  && quality_value < 20){
+                            pos = j+readitem.pos;
+                        } else if (!readitem.dir && quality_value_r < 20) {
+                            pos = (readitem.seq.length-1-(j+readitem.pos));
                         } else {
                             submit = false;
                         }
                         if (submit) {
+                            //\\
+                            //output.collect(new Text(id), new Text(pos+":IC"));
+                            //\\
                             if (outcode_list.containsKey(id)){
                                 StringBuffer sb = outcode_list.get(id);
                                 if (pos >= sb.length()){
@@ -579,37 +706,151 @@ public class FindError extends Configured implements Tool
                         //\\\\\\\\\\\\\\\\\\\\\\\\\\
                     }
                 }
-                //\\ righ array
-                for(int j=readarray[i].pos + IDX; j < readarray[i].seq.length; j++) {
-                    String id = readarray[i].id;
+            }
+            //  right range 
+            //for(int j=readarray[i].pos + IDX; j < readarray[i].seq.length; j++) {
+            for(int j=0; j < right_len; j++) {
+                char consensus = 'N';
+                for(int k=0; k < 6; k++) {
+                    array[k] = 0;
+                    if (k < 4) {
+                        lose[k] = 0;
+                    }
+                } 
+                //\\
+                //debug = "";
+                //\\
+                for(int i=0; i < readarray.length; i++) {
+                    ReadInfo readitem = readarray[i];
+                    if (j+readitem.pos + IDX >= readitem.seq.length) {
+                        //debug = debug + " ";
+                        continue;
+                    }
+                    array[4] = array[4] + 1;
+                    /*int quality_value;
+                    char base_char;
+                    if (readarray[i].dir) {
+                        quality_value = (int)id_seq.get(readarray[i].id).qv.charAt(j+readarray[i].pos + IDX) - 33;
+                        base_char = id_seq.get(readarray[i].id).seq.charAt(j+readarray[i].pos + IDX);
+                    } else {
+                        String qv_reverse = new StringBuffer(id_seq.get(readarray[i].id).qv).reverse().toString();
+                        quality_value = (int)qv_reverse.charAt(j+readarray[i].pos + IDX) -33;
+                        base_char = Node.rc(id_seq.get(readarray[i].id).seq).charAt(j+readarray[i].pos + IDX);
+                    }*/
+                    int quality_value = readitem.int_qv[j+readarray[i].pos + IDX];
+                    char base_char = (char)readitem.seq[j+readarray[i].pos + IDX];
+                    if (quality_value < 0) {
+                        quality_value = 0;
+                    } else if (quality_value > 40) {
+                        quality_value = 40;
+                    }
+                    if (base_char == 'A') {
+                        array[0] = array[0] + quality_value;
+                        if (quality_value >= 20)
+                            lose[0] = lose[0]+1;
+                    } else if (base_char == 'T') {
+                        array[1] = array[1] + quality_value;
+                        if (quality_value >= 20)
+                            lose[1] = lose[1]+1;
+                    } else if (base_char == 'C') {
+                        array[2] = array[2] + quality_value;
+                        if (quality_value >= 20)
+                            lose[2] = lose[2]+1;
+                    } else if (base_char == 'G') {
+                        array[3] = array[3] + quality_value;
+                        if (quality_value >= 20)
+                            lose[3] = lose[3]+1;
+                    }
+                    //debug = debug + base_char;
+                }
+                //\\
+                //output.collect(new Text(node.getNodeId()), new Text("(" + debug + ")"));
+                //\\
+                if ( array[0] > array[1] && array[0] > array[2] && array[0] > array[3]) {
+                    consensus = 'A';
+                    array[5] = array[0];
+                } else if (array[1] > array[0] && array[1] > array[2] && array[1] > array[3]) {
+                    consensus = 'T';
+                    array[5] = array[1];
+                } else if (array[2] > array[0] && array[2] > array[1] && array[2] > array[3]) {
+                    consensus = 'C';
+                    array[5] = array[2];
+                } else if (array[3] > array[0] && array[3] > array[1] && array[3] > array[2]) {
+                    consensus = 'G';
+                    array[5] = array[3];
+                } else {
+                    consensus = 'N';
+                    array[5] = array[0];
+                }
+                int support = 0;
+                if (lose[0] >= majority ){
+                	support = support +1;
+                }
+                if (lose[1] >= majority ){
+                	support = support +1;
+                }
+                if (lose[2] >= majority ){
+                	support = support +1;
+                }
+                if (lose[3] >= majority ){
+                	support = support +1;
+                }
+                if (support >= 2 || array[4] < reads_threshold) {
+                    break; //branch
+                }
+                for(int i=0; i < readarray.length; i++) {
+                    ReadInfo readitem = readarray[i];
+                    if (j+readitem.pos + IDX >= readitem.seq.length) {
+                        continue;
+                    }
+                    String id = readitem.id;
+                    /*int quality_value;
+                    int quality_value_r;
+                    char base_char;
+                    if (readarray[i].dir) {
+                        quality_value = (int)id_seq.get(readarray[i].id).qv.charAt(j+readarray[i].pos + IDX) - 33;
+                        quality_value_r = (int)id_seq.get(readarray[i].id).qv.charAt(readarray[i].len-1-(j+readarray[i].pos + IDX)) - 33;
+                        base_char = id_seq.get(readarray[i].id).seq.charAt(j+readarray[i].pos + IDX);
+                    } else {
+                        String qv_reverse = new StringBuffer(id_seq.get(readarray[i].id).qv).reverse().toString();
+                        quality_value = (int)qv_reverse.charAt(j+readarray[i].pos + IDX) -33;
+                        quality_value_r = (int)qv_reverse.charAt(readarray[i].len-1-(j+readarray[i].pos + IDX)) -33;
+                        base_char = Node.rc(id_seq.get(readarray[i].id).seq).charAt(j+readarray[i].pos + IDX);
+                    }*/
+                    char base_char = (char)readitem.seq[j+readitem.pos + IDX];
+                    int quality_value = readitem.int_qv[j+readitem.pos + IDX];
+                    int quality_value_r = readitem.int_qv[readitem.seq.length-1-(j+readitem.pos + IDX)];
                     int pos = 0;
                     char chr = 'X';
-                    if (right_consensus.charAt(j-readarray[i].pos-IDX) == readarray[i].seq[j]){
+                    if (consensus == base_char){
                         // Comfirmation
                         boolean confirm = false;
-                        if (readarray[i].seq[j] == 'A' && ( right_lose[j-readarray[i].pos-IDX][1] < 2 && right_lose[j-readarray[i].pos-IDX][2] < 2 && right_lose[j-readarray[i].pos-IDX][3] < 2) && right_lose[j-readarray[i].pos-IDX][0] >= 3 ) {
+                        if (base_char == 'A' && ( lose[1] < 2 && lose[2] < 2 && lose[3] < 2) && lose[0] >= 2 ) {
                             confirm = true;
                         }
-                        if (readarray[i].seq[j] == 'T' && ( right_lose[j-readarray[i].pos-IDX][0] < 2 && right_lose[j-readarray[i].pos-IDX][2] < 2 && right_lose[j-readarray[i].pos-IDX][3] < 2) && right_lose[j-readarray[i].pos-IDX][1] >= 3 ) {
+                        if (base_char == 'T' && ( lose[0] < 2 && lose[2] < 2 && lose[3] < 2) && lose[1] >= 2 ) {
                             confirm = true;
                         }
-                        if (readarray[i].seq[j] == 'C' && ( right_lose[j-readarray[i].pos-IDX][0] < 2 && right_lose[j-readarray[i].pos-IDX][1] < 2 && right_lose[j-readarray[i].pos-IDX][3] < 2) && right_lose[j-readarray[i].pos-IDX][2] >= 3 ) {
+                        if (base_char == 'C' && ( lose[0] < 2 && lose[1] < 2 && lose[3] < 2) && lose[2] >= 2 ) {
                             confirm = true;
                         }
-                        if (readarray[i].seq[j] == 'G' && ( right_lose[j-readarray[i].pos-IDX][0] < 2 && right_lose[j-readarray[i].pos-IDX][1] < 2 && right_lose[j-readarray[i].pos-IDX][2] < 2) && right_lose[j-readarray[i].pos-IDX][3] >= 3 ) {
+                        if (base_char == 'G' && ( lose[0] < 2 && lose[1] < 2 && lose[2] < 2) && lose[3] >= 2 ) {
                             confirm = true;
                         }
                         
                         if (confirm ) {
                             boolean submit=true;
-                            if (readarray[i].dir.equals("f") && readarray[i].int_qv[j] < 20){
-                                pos = j;
-                            } else if (readarray[i].dir.equals("r") && readarray[i].int_qv[readarray[i].seq.length-1-j] < 20) {
-                                pos = readarray[i].seq.length-1-j;
+                            if (readitem.dir && quality_value < 20){
+                                pos = j+readitem.pos + IDX;
+                            } else if (!readitem.dir && quality_value_r < 20) {
+                                pos = readitem.seq.length-1-(j+readitem.pos + IDX);
                             } else {
                                 submit = false;
                             }
                             if (submit) {
+                                //\\
+                                //output.collect(new Text(id), new Text(pos+":RC"));
+                                //\\
                                 if (outcode_list.containsKey(id)){
                                     StringBuffer sb = outcode_list.get(id);
                                     if (pos >= sb.length()){
@@ -635,28 +876,48 @@ public class FindError extends Configured implements Tool
                             //\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
                         }
                     } else {
-                        if (!(right_consensus.charAt(j-readarray[i].pos-IDX) == 'N')) {
+                        if (consensus != 'N') {
                             //\\
-                            if (readarray[i].seq[j] == 'A' && ( right_lose[j-readarray[i].pos-IDX][0] >= 2 || (float)right_array[j-readarray[i].pos-IDX][0]/(float)right_array[j-readarray[i].pos-IDX][5] > 0.25f) ) {
-                                continue;
+                            float A_ratio = (float)array[0]/(float)array[5];
+                            float T_ratio = (float)array[1]/(float)array[5];
+                            float C_ratio = (float)array[2]/(float)array[5];
+                            float G_ratio = (float)array[3]/(float)array[5];
+                            if (consensus == 'A' && (T_ratio > 0.25 || C_ratio > 0.25 || G_ratio > 0.25)) {
+                                break;
                             }
-                            if (readarray[i].seq[j] == 'T' && ( right_lose[j-readarray[i].pos-IDX][1] >= 2 || (float)right_array[j-readarray[i].pos-IDX][1]/(float)right_array[j-readarray[i].pos-IDX][5] > 0.25f )) {
-                                continue;
+                            if (consensus == 'T' && (A_ratio > 0.25 || C_ratio > 0.25 || G_ratio > 0.25)) {
+                                break;
                             }
-                            if (readarray[i].seq[j] == 'C' && ( right_lose[j-readarray[i].pos-IDX][2] >= 2 || (float)right_array[j-readarray[i].pos-IDX][2]/(float)right_array[j-readarray[i].pos-IDX][5] > 0.25f )) {
-                                continue;
+                            if (consensus == 'C' && (A_ratio > 0.25 || T_ratio > 0.25 || G_ratio > 0.25)) {
+                                break;
                             }
-                            if (readarray[i].seq[j] == 'G' && ( right_lose[j-readarray[i].pos-IDX][3] >= 2 || (float)right_array[j-readarray[i].pos-IDX][3]/(float)right_array[j-readarray[i].pos-IDX][5] > 0.25f )) {
-                                continue;
+                            if (consensus == 'G' && (A_ratio > 0.25 || T_ratio > 0.25 || C_ratio > 0.25)) {
+                                break;
+                            }
+                            //\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
+                            if (base_char == 'A' && ( lose[0] >= 2 || (float)array[0]/(float)array[5] > 0.25f) ) {
+                                break;
+                            }
+                            if (base_char == 'T' && ( lose[1] >= 2 || (float)array[1]/(float)array[5] > 0.25f )) {
+                                break;
+                            }
+                            if (base_char == 'C' && ( lose[2] >= 2 || (float)array[2]/(float)array[5] > 0.25f )) {
+                                break;
+                            }
+                            if (base_char == 'G' && ( lose[3] >= 2 || (float)array[3]/(float)array[5] > 0.25f )) {
+                                break;
                             }
                             //\\
-                            if (readarray[i].dir.equals("f")){
-                                pos = j;
-                                chr = right_consensus.charAt(j-readarray[i].pos-IDX);
-                            } else if (readarray[i].dir.equals("r")) {
-                                pos = (readarray[i].seq.length-1-j);
-                                chr = Node.rc(right_consensus.charAt(j-readarray[i].pos-IDX)+"").charAt(0);
+                            if (readitem.dir){
+                                pos = j+readitem.pos + IDX;
+                                chr = consensus;
+                            } else if (!readitem.dir) {
+                                pos = (readitem.seq.length-1-(j+readitem.pos + IDX));
+                                chr = Node.rc(consensus+"").charAt(0);
                             }
+                            //\\
+                            //output.collect(new Text(id), new Text(pos+":R"));
+                            //\\
                             if (outcode_list.containsKey(id)){
                                 StringBuffer sb = outcode_list.get(id);
                                 if (pos >= sb.length()){
@@ -685,15 +946,19 @@ public class FindError extends Configured implements Tool
                     }
                 }
             }
+            } // for each readstack
+            
+            
             boolean export = false;
             for(String read_id : outcode_list.keySet())
             {
                 String msg="";
                 msg = Node.str2code(outcode_list.get(read_id).toString());
                 node.addConfirmations(read_id, msg);
+                //output.collect(new Text(read_id), new Text(Node.UPDATEMSG + "\t" + msg));
                 export = true;
             }
-            if (export ) {
+            if (export) {
                 output.collect(new Text(node.getNodeId()), new Text(node.toNodeMsg()));
             }
 		}

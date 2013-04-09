@@ -82,9 +82,7 @@ public class PreProcessReads extends Configured implements Tool
 			// Hard chop a few bases off of each end of the read
 			if (TRIM5 > 0 || TRIM3 > 0)
 			{
-				// System.err.println("orig: " + seq);
 				seq = seq.substring(TRIM5, seq.length() - TRIM5 - TRIM3);
-				// System.err.println("trim: " + seq);
 			}
 
 			// Automatically trim Ns off the very ends of reads

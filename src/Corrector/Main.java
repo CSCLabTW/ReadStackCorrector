@@ -152,7 +152,7 @@ public class Main extends Configured implements Tool
         Graph2Fasta g2f = new Graph2Fasta();
 		start("convertFasta " + graphdir);
 		RunningJob job = g2f.run(basePath + graphdir, fastadir.substring(0,fastadir.length()-1) +"_file");
-        FileSystem.get(baseconf).delete(new Path(basePath), true);
+        //FileSystem.get(baseconf).delete(new Path(basePath), true);
         end(job);
         msg("\n");
 	}
@@ -238,18 +238,20 @@ public class Main extends Configured implements Tool
             if (round > 1 && fix_char == 0) {
                 break;
             }
+           
             start("\n  Correction ");
             Correction corr = new Correction();
             job = corr.run(basePath + current + "," + basePath + current + ".fe", basePath + error + "." + round);
             fix_char = counter(job, "fix_char");
             confirm_char = counter(job, "confirms");
-            msg(" " + confirm_char + " conflicts " + fix_char + " fix_chars \n");
+            msg(" " + confirm_char + " confirms " + fix_char + " fix_chars \n");
             end(job);
             current = error + "." + round;
         }
         msg("\n");
         
         //\\ trusted k-mer
+        //String current = error + ".2";
         KmerFrequencyOfReads kfr = new KmerFrequencyOfReads();
         IdentifyTrustedReads itr = new IdentifyTrustedReads();
         TagTrustedReads tagr = new TagTrustedReads();

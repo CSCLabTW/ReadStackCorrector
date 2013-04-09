@@ -757,6 +757,10 @@ public class Node {
         String words = "IIIIIIIIIIIIGIIGIIIHIIIIIHHIHHHFIIIIIIHIGIHGBGGEHHCHEEGEEEEE?BEBC@B@@D@B?@@######################!!!!";
         String reverse = new StringBuffer(words).reverse().toString();
         //System.out.println("SRR081522.30648655/1".replaceAll(".", "_").toString());
+        String DNA = "TCGXN";
+        byte[] DNAArray = DNA.getBytes(); 
+        System.out.println("ASCII A:" + DNAArray[0]  + " T:" + DNAArray[1] + " C:" + DNAArray[2] + " G:" + DNAArray[3] + " X:" + DNAArray[4] + " N:" + DNAArray[5]);
+        System.out.println((char)67);
         System.out.println(words);
         System.out.println(reverse);
         System.out.println(Node.dna2str(str0));

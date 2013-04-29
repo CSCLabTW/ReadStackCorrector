@@ -7,7 +7,14 @@
 
 package Corrector;
 
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileReader;
 import java.io.IOException;
+import java.io.RandomAccessFile;
+import java.net.URI;
+import java.nio.MappedByteBuffer;
+import java.nio.channels.FileChannel;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -20,6 +27,7 @@ import java.util.Map;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.Configured;
+import org.apache.hadoop.filecache.DistributedCache;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.LongWritable;
@@ -50,19 +58,79 @@ public class FindError extends Configured implements Tool
 	{
 		public static int K = 0;
         public static int IDX = 0;
-		public static int TRIM5 = 0;
-		public static int TRIM3 = 0;
+        private static Path[] localFiles;
+        private static HashSet<String> HKmer_List = new HashSet<String>();
+		//public static int TRIM5 = 0;
+		//public static int TRIM3 = 0;
 
 		public void configure(JobConf job)
 		{
 			//K = Integer.parseInt(job.get("K"));
             IDX = Integer.parseInt(job.get("IDX"));
+            try {
+                localFiles = DistributedCache.getLocalCacheFiles(job);
+            } catch (IOException ioe) {
+                System.err.println("Caught exception while getting cached files: " + ioe.toString());
+            }
+            try {
+            	String str;
+            	String str_r;
+            	File folder = new File(localFiles[0].toString());
+            	for (final File fileEntry : folder.listFiles()) {
+            		//\\
+            		//\\read distributed cache file : load data from file to id_seq   
+                    RandomAccessFile f = new RandomAccessFile(fileEntry.getAbsolutePath(), "r");
+                    FileChannel ch = f.getChannel();
+                    String first_line = "BBBEBBBBBBBB	";
+                    int readlen = first_line.length(); // to determine the size of one record in the file
+                    byte[] buffer = new byte[readlen];
+                    long buff_start = 0; //store buffer start position
+                    int buff_pos = 0; // fetch data from this buffer position
+                    
+                    // determine the buffer size
+                    long read_content = Math.min(Integer.MAX_VALUE, ch.size() - buff_start); //0x8FFFFFF = 128MB
+                    MappedByteBuffer mb = ch.map(FileChannel.MapMode.READ_ONLY, buff_start, read_content);
+                    String kmer;
+                    while ( mb.hasRemaining( ) && mb.position()+readlen <= read_content ) {
+                    	mb.get(buffer);
+                    	kmer = new String(buffer);
+                    	str = Node.dna2str(kmer.trim());
+	            		str_r = Node.rc(str);
+	            		HKmer_List.add(str);
+	            		HKmer_List.add(str_r);
+                    }
+                    ch.close();
+                    f.close();
+            		//\\
+                }
+            } catch (IOException ioe){
+            	System.err.println("Caught exception while reading cached files: " + ioe.toString());
+            }
 		}
 
 		public void map(LongWritable lineid, Text nodetxt,
 				        OutputCollector<Text, Text> output, Reporter reporter)
 		                throws IOException
 		{
+			/*List<String> HKmer_List = new ArrayList<String>();
+			try {
+            	String str;
+            	String str_r;
+            	File folder = new File(localFiles[0].toString());
+            	for (final File fileEntry : folder.listFiles()) {	
+            		BufferedReader readBuffer = new BufferedReader(new FileReader(fileEntry.getAbsolutePath()));
+            		//System.out.println(fileEntry.getName());
+            		while(readBuffer.ready()){
+	            		str = Node.dna2str(readBuffer.readLine().trim());
+	            		str_r = Node.rc(str);
+	            		HKmer_List.add(str);
+	            		HKmer_List.add(str_r);
+	            	}
+	            	readBuffer.close();
+                }
+            } catch (IOException ioe){
+            	System.err.println("Caught exception while reading cached files: " + ioe.toString());
+            }*/
             Node node = new Node();
 			node.fromNodeMsg(nodetxt.toString());
             
@@ -74,6 +142,12 @@ public class FindError extends Configured implements Tool
                 String window_tmp = node.str().substring(i, i+IDX);
                 //\\
                 String window_tmp_r = Node.rc(node.str().substring(i, i+IDX));
+                // H-kmer filter
+                if (HKmer_List.contains(window_tmp)) {
+                	reporter.incrCounter("Brush", "hkmer", 1);
+                	continue;
+                }
+                //\\
                 if (window_tmp.compareTo(window_tmp_r) < 0) {
                     String prefix_half_tmp = window_tmp.substring(0, 20);
                     String suffix_half_tmp = window_tmp.substring(20);
@@ -82,7 +156,7 @@ public class FindError extends Configured implements Tool
                     String group_id = prefix_half;
                     int f_pos = i;
                     if ( !window_tmp.matches("A*") && !window_tmp.matches("T*") ){
-                        if (group_sub.containsKey(group_id)) {
+                        if (group_sub.get(group_id) != null) {
                             // dir, pos, suffix
                             String sub = group_sub.get(group_id);
                             sub = sub + "|" + "f" + "!" + f_pos + "!" + suffix_half;
@@ -101,7 +175,7 @@ public class FindError extends Configured implements Tool
                     int r_pos = end - i;
                     String Qscore_reverse = new StringBuffer(node.Qscore_1()).reverse().toString();
                     if ( !window_tmp_r.matches("A*") && !window_tmp_r.matches("T*") ){
-                        if (group_sub.containsKey(group_id)) {
+                        if (group_sub.get(group_id) != null) {
                             String sub = group_sub.get(group_id);
                             sub = sub + "|" + "r" + "!" + r_pos + "!" + suffix_half_r;
                             group_sub.put(group_id, sub);
@@ -228,7 +302,7 @@ public class FindError extends Configured implements Tool
             //Map<String, String> id_seq = new HashMap<String, String>();
             //Map<String, String> id_qv = new HashMap<String, String>();
             //Map<String, SeqInfo> id_seq = new HashMap<String, SeqInfo>();
-            List<String> H_Kmer = new ArrayList<String>();
+            HashSet<String> H_Kmer = new HashSet<String>();
             
             while(iter.hasNext())
 			{
@@ -253,7 +327,7 @@ public class FindError extends Configured implements Tool
                     String window_tmp = Node.dna2str(prefix.toString()) + Node.dna2str(suffix);
                     String window = Node.str2dna(window_tmp);
                     if (!H_Kmer.contains(window)) {
-                        if (ReadStack_list.containsKey(window)) {
+                        if (ReadStack_list.get(window)!=null) {
                             readlist = ReadStack_list.get(window);
                             if (readlist.size()+1 > HighKmer) {
                                 H_Kmer.add(window);
@@ -483,7 +557,7 @@ public class FindError extends Configured implements Tool
                                 //\\
                                 //output.collect(new Text(id), new Text(pos+":LC"));
                                 //\\
-                                if (outcode_list.containsKey(id)){
+                                if (outcode_list.get(id) != null){
                                     StringBuffer sb = outcode_list.get(id);
                                     if (pos >= sb.length()){
                                         for(int k=sb.length(); k<=pos; k++) {
@@ -549,7 +623,7 @@ public class FindError extends Configured implements Tool
                             //\\
                             //output.collect(new Text(id), new Text(pos+":L"));
                             //\\
-                            if (outcode_list.containsKey(id)){
+                            if (outcode_list.get(id) != null){
                                 StringBuffer sb = outcode_list.get(id);
                                 if (pos >= sb.length()){
                                     for(int k=sb.length(); k<=pos; k++) {
@@ -681,7 +755,7 @@ public class FindError extends Configured implements Tool
                             //\\
                             //output.collect(new Text(id), new Text(pos+":IC"));
                             //\\
-                            if (outcode_list.containsKey(id)){
+                            if (outcode_list.get(id) != null){
                                 StringBuffer sb = outcode_list.get(id);
                                 if (pos >= sb.length()){
                                     for(int k=sb.length(); k<=pos; k++) {
@@ -851,7 +925,7 @@ public class FindError extends Configured implements Tool
                                 //\\
                                 //output.collect(new Text(id), new Text(pos+":RC"));
                                 //\\
-                                if (outcode_list.containsKey(id)){
+                                if (outcode_list.get(id) != null){
                                     StringBuffer sb = outcode_list.get(id);
                                     if (pos >= sb.length()){
                                         for(int k=sb.length(); k<=pos; k++) {
@@ -918,7 +992,7 @@ public class FindError extends Configured implements Tool
                             //\\
                             //output.collect(new Text(id), new Text(pos+":R"));
                             //\\
-                            if (outcode_list.containsKey(id)){
+                            if (/*outcode_list.containsKey(id)*/outcode_list.get(id) != null){
                                 StringBuffer sb = outcode_list.get(id);
                                 if (pos >= sb.length()){
                                     for(int k=sb.length(); k<=pos; k++) {
@@ -966,7 +1040,7 @@ public class FindError extends Configured implements Tool
 
 
 
-	public RunningJob run(String inputPath, String outputPath, int idx) throws Exception
+	public RunningJob run(String inputPath, String outputPath, int idx, String hkmerlist) throws Exception
 	{
 		sLogger.info("Tool name: FindError");
 		sLogger.info(" - input: "  + inputPath);
@@ -975,6 +1049,10 @@ public class FindError extends Configured implements Tool
 		JobConf conf = new JobConf(FindError.class);
 		conf.setJobName("FindError " + inputPath + " " + Config.K);
         conf.setLong("IDX", idx);
+        //\\
+        DistributedCache.addCacheFile(new URI(hkmerlist), conf);
+        //\\
+		
         
 		Config.initializeConfiguration(conf);
 
@@ -1007,7 +1085,7 @@ public class FindError extends Configured implements Tool
 
 		long starttime = System.currentTimeMillis();
 
-		run(inputPath, outputPath, 1);
+		run(inputPath, outputPath, 1, "X");
 
 		long endtime = System.currentTimeMillis();
 

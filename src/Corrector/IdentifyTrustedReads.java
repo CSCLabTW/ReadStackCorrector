@@ -79,7 +79,7 @@ public class IdentifyTrustedReads extends Configured implements Tool
                 if (frequency <= KmerThreshold) {
                     untrust_count = untrust_count + 1;
                     TRUST = 0;
-                    continue;
+                    break;
                 }
             }
             

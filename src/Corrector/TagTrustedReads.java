@@ -74,7 +74,7 @@ public class TagTrustedReads extends Configured implements Tool
 		{
             Node node = new Node(prefix.toString());
             int sawnode = 0;
-            boolean trust = false;
+            boolean trust = true;
             while(iter.hasNext())
 			{
                 String msg = iter.next().toString();

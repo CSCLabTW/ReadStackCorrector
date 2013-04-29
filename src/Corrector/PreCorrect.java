@@ -7,7 +7,15 @@
 
 package Corrector;
 
+import java.io.RandomAccessFile ;
+import java.nio.MappedByteBuffer;
+import java.nio.channels.FileChannel;
+
+import java.io.BufferedReader;
+import java.io.FileReader;
+import java.io.File;
 import java.io.IOException;
+import java.net.URI;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -20,6 +28,7 @@ import java.util.Map;
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.Configured;
+import org.apache.hadoop.filecache.DistributedCache;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.LongWritable;
@@ -48,19 +57,60 @@ public class PreCorrect extends Configured implements Tool
 	public static class PreCorrectMapper extends MapReduceBase
     implements Mapper<LongWritable, Text, Text, Text>
 	{
-		public static int TRIM5 = 0;
-		public static int TRIM3 = 0;
+		//public static int TRIM5 = 0;
+		//public static int TRIM3 = 0;
         private static int IDX = 0;
+        private static Path[] localFiles;
+        private static HashSet<String> HKmer_List = new HashSet<String>();
 
 		public void configure(JobConf job)
 		{
             IDX = Integer.parseInt(job.get("IDX"));
+            /*try {
+                localFiles = DistributedCache.getLocalCacheFiles(job);
+            } catch (IOException ioe) {
+                System.err.println("Caught exception while getting cached files: " + ioe.toString());
+            }
+            try {
+            	String str;
+            	String str_r;
+            	File folder = new File(localFiles[0].toString());
+            	for (File fileEntry : folder.listFiles()) {
+            		//\\
+            		//\\read distributed cache file : load data from file to id_seq   
+                    RandomAccessFile f = new RandomAccessFile(fileEntry.getAbsolutePath(), "r");
+                    FileChannel ch = f.getChannel();
+                    String first_line = "BBBEBBBBBBBB	";
+                    int readlen = first_line.length(); // to determine the size of one record in the file
+                    byte[] buffer = new byte[readlen];
+                    long buff_start = 0; //store buffer start position
+                    int buff_pos = 0; // fetch data from this buffer position
+                    
+                    // determine the buffer size
+                    long read_content = Math.min(Integer.MAX_VALUE, ch.size() - buff_start); //0x8FFFFFF = 128MB
+                    MappedByteBuffer mb = ch.map(FileChannel.MapMode.READ_ONLY, buff_start, read_content);
+                    String kmer;
+                    while ( mb.hasRemaining( ) && mb.position()+readlen <= read_content ) {
+                    	mb.get(buffer);
+                    	kmer = new String(buffer);
+                    	str = Node.dna2str(kmer.trim());
+	            		str_r = Node.rc(str);
+	            		HKmer_List.add(str);
+	            		HKmer_List.add(str_r);
+                    }
+                    ch.close();
+                    f.close();
+            		//\\
+                }
+            } catch (IOException ioe){
+            	System.err.println("Caught exception while reading cached files: " + ioe.toString());
+            }*/
 		}
 
 		public void map(LongWritable lineid, Text nodetxt,
 				        OutputCollector<Text, Text> output, Reporter reporter)
 		                throws IOException
-		{
+		{	
             Node node = new Node();
 			node.fromNodeMsg(nodetxt.toString());
             
@@ -70,6 +120,11 @@ public class PreCorrect extends Configured implements Tool
             {
                 String window_tmp = node.str().substring(i, i+(IDX/2)) + node.str().substring(i+(IDX/2+1), i+(IDX+1));
                 String window_tmp_r = Node.rc(window_tmp);
+                // H-kmer filter
+                /*if (HKmer_List.contains(window_tmp)) {
+                	reporter.incrCounter("Brush", "hkmer", 1);
+                	continue;
+                }*/
                 //\\
                 if (window_tmp.compareTo(window_tmp_r) < 0) {
                     String prefix_half_tmp = window_tmp.substring(0, IDX/2);
@@ -89,10 +144,18 @@ public class PreCorrect extends Configured implements Tool
                     int r_pos = end - i + (IDX/2);
                     String Qscore_reverse = new StringBuffer(node.Qscore_1()).reverse().toString();
                     if ( !window_tmp_r.matches("A*") && !window_tmp_r.matches("T*") ){
-                         output.collect(new Text(prefix_half_r),
+                        //try { 
+                    	output.collect(new Text(prefix_half_r),
                                    new Text(node.getNodeId() + "\t" + "r" + "\t" + r_pos + "\t" + Node.rc(node.str()).charAt(r_pos) + "\t" + node.Qscore_1().charAt(r_pos) + "\t" + suffix_half_r + "\t" + node.str().length()));
+                        //} catch (Exception e) {
+                        //	throw new IOException("node_len: " + node.str().length() + " r_pos: " + r_pos + " qv_len: " + node.Qscore_1().length() + " r_pos: " + r_pos  );
+                        //}
                     }
                 }
+                
+                //debug
+                //output.collect(new Text(HKmer_List.get(0)),new Text(HKmer_List.size()+""));
+               
                 //\\
                 
                 /*int f_pos = i + (IDX/2);
@@ -197,7 +260,7 @@ public class PreCorrect extends Configured implements Tool
                 //\\
                 String window_tmp = Node.dna2str(prefix.toString()) + Node.dna2str(vals[5]);
                 String window = Node.str2dna(window_tmp);
-                if (ReadStack_list.containsKey(window)) {
+                if (ReadStack_list.get(window) != null) {
                     readlist = ReadStack_list.get(window);
                     readlist.add(read_item);
                     ReadStack_list.put(window, readlist);
@@ -322,9 +385,9 @@ public class PreCorrect extends Configured implements Tool
                         //\\
                         if (readitem.dir && fix) {
                             String correct_msg =readitem.id + "," + readitem.pos + "," + correct_base;
-                            if (!corrects_list.contains(correct_msg)){
+                            //if (!corrects_list.contains(correct_msg)){
                                 corrects_list.add(correct_msg);
-                            }
+                            //}
                             //\\
                             //output.collect(new Text("COR"), new Text(correct_msg));
                             //\\
@@ -333,13 +396,13 @@ public class PreCorrect extends Configured implements Tool
                         if (!readitem.dir && fix) {
                             int pos = readitem.len-1-readitem.pos;
                             String correct_msg = readitem.id + "," + pos + "," + Node.rc(correct_base+"");
-                            if (!corrects_list.contains(correct_msg)){
+                            //if (!corrects_list.contains(correct_msg)){
                                 corrects_list.add(correct_msg);
                                 //\\
                                 //output.collect(new Text("COR"), new Text(correct_msg));
                                 //\\
                                 reporter.incrCounter("Brush", "fix_char", 1);
-                            } 
+                            //} 
                         }
                     }
                 }
@@ -350,6 +413,8 @@ public class PreCorrect extends Configured implements Tool
             Node node = new Node("MSG");
             node.setstr_raw("X");
             node.setCoverage(1);
+            // remove redundant correct msg
+            corrects_list = new ArrayList(new HashSet(corrects_list));
             
             Map<String, List<String>> out_list = new HashMap<String, List<String>>();
             for(int i=0; i < corrects_list.size(); i++) {
@@ -390,7 +455,7 @@ public class PreCorrect extends Configured implements Tool
 
 
 
-	public RunningJob run(String inputPath, String outputPath, int idx) throws Exception
+	public RunningJob run(String inputPath, String outputPath, int idx, String hkmerlist) throws Exception
 	{
 		sLogger.info("Tool name: PreCorrect");
 		sLogger.info(" - input: "  + inputPath);
@@ -399,8 +464,11 @@ public class PreCorrect extends Configured implements Tool
 		JobConf conf = new JobConf(PreCorrect.class);
 		conf.setJobName("PreCorrect " + inputPath + " " + Config.K);
         conf.setLong("IDX", idx);
-        
-		Config.initializeConfiguration(conf);
+        //\\
+        DistributedCache.addCacheFile(new URI(hkmerlist), conf);
+        //\\
+		
+        Config.initializeConfiguration(conf);
 
 		FileInputFormat.addInputPath(conf, new Path(inputPath));
 		FileOutputFormat.setOutputPath(conf, new Path(outputPath));
@@ -431,7 +499,7 @@ public class PreCorrect extends Configured implements Tool
 
 		long starttime = System.currentTimeMillis();
 
-		run(inputPath, outputPath, 0);
+		run(inputPath, outputPath, 0,"XX");
 
 		long endtime = System.currentTimeMillis();
 

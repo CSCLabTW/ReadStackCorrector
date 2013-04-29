@@ -58,7 +58,7 @@ public class Config {
   
     // kmer status
 	public static long LOW_KMER = 1;
-	public static long UP_KMER = 250;
+	public static long UP_KMER = 500;
 
     // stats
 	public static String RUN_STATS = null;
@@ -158,7 +158,8 @@ public class Config {
         options.addOption(OptionBuilder.withArgName("kmer upper bound").hasArg().withDescription("max kmer cov (default: " + UP_KMER ).create("kmerup"));
 		options.addOption(OptionBuilder.withArgName("kmer lower bound").hasArg().withDescription("min kmer cov (default: " + LOW_KMER).create("kmerlow"));
      
-        
+		
+		
         CommandLineParser parser = new GnuParser();
 
 	    try
@@ -203,7 +204,9 @@ public class Config {
 	        if (line.hasOption("timeout"))  { HADOOP_TIMEOUT  = Long.parseLong(line.getOptionValue("timeout")); }
             if (line.hasOption("readlen"))     { READLEN     = Long.parseLong(line.getOptionValue("readlen")); }
             if (line.hasOption("kmerup"))       { UP_KMER      = Long.parseLong(line.getOptionValue("kmerup")); }  
-        }
+            if (line.hasOption("start")) { STARTSTAGE = line.getOptionValue("start"); }
+	        if (line.hasOption("stop"))  { STOPSTAGE  = line.getOptionValue("stop");  }
+	    }
 	    catch( ParseException exp )
 	    {
 	        System.err.println( "Parsing failed.  Reason: " + exp.getMessage() );

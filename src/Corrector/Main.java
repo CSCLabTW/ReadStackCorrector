@@ -57,8 +57,11 @@ public class Main extends Configured implements Tool
 	JobConf baseconf = new JobConf(Main.class);
 
     static String loadreads = "00-loadreads";
-    static String error = "01-error";
-    static String sfa = "02-sfa";
+    static String precorrect = "01-precorrect";
+    static String finderror = "02-finderror";
+    static String screening = "03-screening";
+    static String stopwords = "stopwords";
+    static String sfa = "04-sfa";
     
 
     // Message Management
@@ -163,7 +166,7 @@ public class Main extends Configured implements Tool
 	public void convertSfa(String basePath, String graphdir, String sfadir) throws Exception
 	{
         Graph2Sfa g2s = new Graph2Sfa();
-		start("convertsfa " + graphdir + " > " + sfadir);
+		start("\nconvertsfa " + graphdir + " > " + sfadir);
 		RunningJob job = g2s.run(basePath + graphdir, sfadir);
 		end(job);
 		long nodes = counter(job, "nodes");
@@ -172,7 +175,7 @@ public class Main extends Configured implements Tool
     
     // preprocess
 	///////////////////////////////////////////////////////////////////////////
-    public void loadreads(String inputPath, String basePath, String loadreads) throws Exception
+    public void loadreads(String inputPath, String basePath, String loadreads, String stopword) throws Exception
 	{
 		RunningJob job;
         //long trans_edge = 0;
@@ -201,15 +204,51 @@ public class Main extends Configured implements Tool
         long Q40   = counter(job, "Q40");
         msg( " [" + Q0 + " base(<Q0), " + Q0_Q10 + " base(Q0-Q10), " + Q10_Q20 + " base(Q10-Q20), " + Q20_Q30 + " base(Q20-Q30), " + Q30_Q40 + " base(Q30-Q40), " + Q40 + " base(>Q40)");
         msg("\n");
+        start("\n  Build High Frequency Kmer List");
+        BuildHighKmerList bhk = new BuildHighKmerList();
+        job = bhk.run(basePath + loadreads, basePath + stopword);
+        end(job);
+        long hkmer = counter(job, "hkmer");
+        msg("H_kmer: " + hkmer);
+        msg("\n");
        
 	}
     
-   
+    public void trimreads(String inputPath, String outdir) throws Exception
+    {
+    	RunningJob job;
+        //long trans_edge = 0;
+        start("\n  Trim Reads");
+        trimSeq2Fastq t2f = new trimSeq2Fastq();
+        job = t2f.run(inputPath, outdir.substring(0,outdir.length()-1) +"_trim");
+        end(job);
+        msg("\n");
+    }
     
-    public void ErrorCorrection(String inputPath, String basePath, String preprocess, String error, int idx_len) throws Exception
+   
+    public void PreCorrection(String basePath, String input, String output, int idx_len, String hkmerlist) throws Exception{
+    	RunningJob job;
+    	msg("\nPreCorrect:");
+        start("\n  PreCorrect ");
+        PreCorrect pc = new PreCorrect();
+        job = pc.run(basePath + input, basePath + input + ".msg", idx_len, basePath + hkmerlist);
+        long hkmer = counter(job, "hkmer");
+        long fix_char = counter(job, "fix_char");
+        msg(" " +  hkmer + " HKmer_skip  " + fix_char + " fix_chars \n");
+        end(job);
+        start("\n  PCorrection ");
+        PCorrection pcorr = new PCorrection();
+        job = pcorr.run(basePath + input + "," + basePath + input + ".msg", basePath + output);
+        fix_char = counter(job, "fix_char");
+        msg("  " + fix_char + " fix_chars \n");
+        end(job);
+        msg("\n");
+    }
+    
+    public void ErrorCorrection(/*String inputPath,*/ String basePath, String input, String output, int idx_len, String hkmerlist) throws Exception
 	{
         RunningJob job;
-        start("\n  PreCorrect ");
+        /*start("\n  PreCorrect ");
         PreCorrect pc = new PreCorrect();
         job = pc.run(basePath + preprocess, basePath + preprocess + ".msg", idx_len);
         long fix_char = counter(job, "fix_char");
@@ -220,20 +259,23 @@ public class Main extends Configured implements Tool
         job = pcorr.run(basePath + preprocess + "," + basePath + preprocess + ".msg", basePath + preprocess + ".pre");
         fix_char = counter(job, "fix_char");
         msg("  " + fix_char + " fix_chars \n");
-        end(job);
+        end(job);*/
         //msg("\nError Correction:");
-        String current = preprocess + ".pre";
-        fix_char = 1;
+        msg("\nFindError:");
+        String current = input;
+        long fix_char = 1;
+        long hkmer = 0;
         long round = 0;
         while (fix_char > 0 && round < 2)
         {
             round++;
             start("\n  FindError ");
             FindError fe = new FindError();
-            job = fe.run(basePath + current, basePath + current + ".fe", idx_len);
+            job = fe.run(basePath + current, basePath + current + ".fe", idx_len, basePath + hkmerlist);
             fix_char = counter(job, "fix_char");
+            hkmer = counter(job, "hkmer");
             long confirm_char = counter(job, "confirm_char");
-            msg(" " + confirm_char + " confirm_chars  " + fix_char + " fix_chars \n");
+            msg(" " +  hkmer + " HKmer_skip  " + confirm_char + " confirm_chars  " + fix_char + " fix_chars \n");
             end(job);  
             if (round > 1 && fix_char == 0) {
                 break;
@@ -241,18 +283,20 @@ public class Main extends Configured implements Tool
            
             start("\n  Correction ");
             Correction corr = new Correction();
-            job = corr.run(basePath + current + "," + basePath + current + ".fe", basePath + error + "." + round);
+            job = corr.run(basePath + current + "," + basePath + current + ".fe", basePath + output + "." + round);
             fix_char = counter(job, "fix_char");
             confirm_char = counter(job, "confirms");
             msg(" " + confirm_char + " confirms " + fix_char + " fix_chars \n");
             end(job);
-            current = error + "." + round;
+            current = output + "." + round;
         }
         msg("\n");
+        save_result(basePath, current, output);
+        
         
         //\\ trusted k-mer
         //String current = error + ".2";
-        KmerFrequencyOfReads kfr = new KmerFrequencyOfReads();
+        /*KmerFrequencyOfReads kfr = new KmerFrequencyOfReads();
         IdentifyTrustedReads itr = new IdentifyTrustedReads();
         TagTrustedReads tagr = new TagTrustedReads();
         start("\n  Kmer Frequency of Reads");
@@ -265,12 +309,36 @@ public class Main extends Configured implements Tool
         job = tagr.run(basePath + current + "," + basePath + error + ".itr", basePath + error);
         long failed_reads = counter(job, "failed_reads");
         msg("  " + failed_reads + " failed_reads \n");
-        end(job);
+        end(job);*/
         //\\\\\\\\\\\\\\\\\\
         //save_result(basePath, current, error);
         
     }
     
+    public void Screening(/*String inputPath,*/ String basePath, String input, String output, int idx_len) throws Exception
+	{
+        RunningJob job;
+        //\\ trusted k-mer
+        //String current = error + ".2";
+        KmerFrequencyOfReads kfr = new KmerFrequencyOfReads();
+        IdentifyTrustedReads itr = new IdentifyTrustedReads();
+        TagTrustedReads tagr = new TagTrustedReads();
+        msg("\nScreening:");
+        start("\n  Kmer Frequency of Reads");
+        job = kfr.run(basePath + input, basePath + output + ".kfr");
+        end(job);
+        start("\n  Identify Trusted Reads");
+        job = itr.run(basePath + output + ".kfr", basePath + output + ".itr", 1);
+        end(job);
+        start("\n  Tag Trusted Reads");
+        job = tagr.run(basePath + input + "," + basePath + output + ".itr", basePath + output);
+        long failed_reads = counter(job, "failed_reads");
+        msg("  " + failed_reads + " failed_reads \n");
+        end(job);
+        //\\\\\\\\\\\\\\\\\\
+        //save_result(basePath, current, error);
+        
+    }
    
     
     // Run an entire assembly
@@ -309,28 +377,40 @@ public class Main extends Configured implements Tool
         if (runStage("loadreads"))
         {
             ECstarttime = System.currentTimeMillis();
-            loadreads(Config.hadoopReadPath, Config.hadoopTmpPath, loadreads);
+            loadreads(Config.hadoopReadPath, Config.hadoopTmpPath, loadreads, stopwords);
+            trimreads(Config.hadoopReadPath, Config.hadoopBasePath);
             checkDone();
         }
 
         int round=1;
         String error_out=loadreads;
-        if (runStage("errorcorrect")){
-            ErrorCorrection(Config.hadoopReadPath, Config.hadoopTmpPath, loadreads, error, 24);
+        
+        if (runStage("precorrect")){
+            PreCorrection(Config.hadoopTmpPath, loadreads, precorrect, 24, stopwords);
+        } 
+        
+        if (runStage("finderror")){
+            ErrorCorrection(Config.hadoopTmpPath, precorrect, finderror, 24, stopwords);
         }
+        
+        if (runStage("convertFasta"))
+        {
+            convertFasta(Config.hadoopTmpPath, finderror, Config.hadoopBasePath);
+            checkDone();
+        }
+        
+        if (runStage("screening")){
+            Screening(Config.hadoopTmpPath, finderror, screening, 24);
+        } 
 
         if (runStage("convertSfa"))
         {
-            convertSfa(Config.hadoopTmpPath, error, Config.hadoopBasePath);
+            convertSfa(Config.hadoopTmpPath, screening, Config.hadoopBasePath);
             ECendtime = System.currentTimeMillis();
             checkDone();
         }
 
-        if (runStage("convertFasta"))
-        {
-            convertFasta(Config.hadoopTmpPath, error, Config.hadoopBasePath);
-            checkDone();
-        }
+       
 		
 
         // Final timestamp

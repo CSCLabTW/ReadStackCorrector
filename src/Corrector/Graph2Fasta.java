@@ -62,9 +62,13 @@ public class Graph2Fasta extends Configured implements Tool
 
 			String str = node.str();
 
-			output.collect(new Text(">" + node.getNodeId()), new Text("len=" + str.length() + "\tcov=" + node.cov()));
-
-			int LINE_LEN = 60;
+			//output.collect(new Text(">" + node.getNodeId()), new Text("len=" + str.length() + "\tcov=" + node.cov()));
+			output.collect(new Text("@" + node.getNodeId()), new Text(""));
+			output.collect(new Text(str), null);
+			output.collect(new Text("+" + node.getNodeId()), new Text(""));
+			output.collect(new Text(node.Qscore_1()), null);
+			
+			/*int LINE_LEN = 60;
 
 			for (int i = 0; i < str.length(); i+=LINE_LEN)
 			{
@@ -73,7 +77,7 @@ public class Graph2Fasta extends Configured implements Tool
 
 				String line = str.substring(i, end);
 				output.collect(new Text(line), null);
-			}
+			}*/
         }
 	}
 

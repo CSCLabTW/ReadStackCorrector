@@ -86,7 +86,7 @@ public class PreProcessReads extends Configured implements Tool
 			}
 
 			// Automatically trim Ns off the very ends of reads
-			int endn = 0;
+			/*int endn = 0;
 			while (endn < seq.length() && seq.charAt(seq.length()-1-endn) == 'N') { endn++; }
 			if (endn > 0) { seq = seq.substring(0, seq.length()-endn); }
 
@@ -94,13 +94,19 @@ public class PreProcessReads extends Configured implements Tool
 			while (startn < seq.length() && seq.charAt(startn) == 'N') { startn++; }
 			if (startn > 0 && (seq.length() - startn) > startn) {
                 seq = seq.substring(startn, seq.length() - startn);
-            }
+            }*/
             //if (startn > 0) { seq = seq.substring(startn, seq.length() - startn); }
 
 			// Check for non-dna characters
 			if (seq.matches(".*[^ACGT].*"))
 			{
 				//System.err.println("WARNING: non-DNA characters found in " + tag + ": " + seq);
+				reporter.incrCounter("Brush", "reads_skipped", 1);
+				return;
+			}
+			
+			// Check length of seq equal to length of qv
+			if (seq.length() != qscore.length()) {
 				reporter.incrCounter("Brush", "reads_skipped", 1);
 				return;
 			}
@@ -167,6 +173,7 @@ public class PreProcessReads extends Configured implements Tool
 
 		conf.setMapperClass(PreProcessReadsMapper.class);
 		//conf.setReducerClass(PreProcessReadsReducer.class);
+		conf.setNumReduceTasks(0);
 
 		//delete the output directory if it exists already
 		FileSystem.get(conf).delete(new Path(outputPath), true);

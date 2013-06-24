@@ -122,7 +122,8 @@ public class PreProcessReads extends Configured implements Tool
 			// Now emit the prefix of the reads
             Node node = new Node(tag);
             node.setstr(seq);
-            node.setQscore(qscore);
+            //node.setQscore(qscore);
+            node.setQV(Node.qv2str(qscore));
             node.setCoverage(1);
             //output.collect(new Text(node.getNodeId()), new Text(node.Qscore()) );
             output.collect(new Text(node.getNodeId()), new Text(node.toNodeMsg()));

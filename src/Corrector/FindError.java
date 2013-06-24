@@ -24,6 +24,10 @@ import java.util.Iterator;
 import java.util.Set;
 import java.util.List;
 import java.util.Map;
+//\\
+import java.util.Random;
+//\\
+
 
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.conf.Configured;
@@ -58,6 +62,7 @@ public class FindError extends Configured implements Tool
 	{
 		public static int K = 0;
         public static int IDX = 0;
+        public static int RANDOM_PASS = 100;
         private static Path[] localFiles;
         private static HashSet<String> HKmer_List = new HashSet<String>();
 		//public static int TRIM5 = 0;
@@ -67,6 +72,7 @@ public class FindError extends Configured implements Tool
 		{
 			//K = Integer.parseInt(job.get("K"));
             IDX = Integer.parseInt(job.get("IDX"));
+            RANDOM_PASS = Integer.parseInt(job.get("RANDOM_PASS"));
             try {
                 localFiles = DistributedCache.getLocalCacheFiles(job);
             } catch (IOException ioe) {
@@ -131,6 +137,10 @@ public class FindError extends Configured implements Tool
             } catch (IOException ioe){
             	System.err.println("Caught exception while reading cached files: " + ioe.toString());
             }*/
+			// Random seed
+			Random dice = new Random();
+			int number;
+			//\\\\\\\\\\
             Node node = new Node();
 			node.fromNodeMsg(nodetxt.toString());
             
@@ -139,6 +149,12 @@ public class FindError extends Configured implements Tool
             int end = node.len() - IDX;
             for (int i = 0; i < end; i++)
             {
+            	//Randomize
+            	number = dice.nextInt(100);
+            	if (number >= RANDOM_PASS) {
+            		continue;
+            	}
+            	//\\\\\\\\\\\\\\\\\\\\\
                 String window_tmp = node.str().substring(i, i+IDX);
                 //\\
                 String window_tmp_r = Node.rc(node.str().substring(i, i+IDX));
@@ -173,7 +189,8 @@ public class FindError extends Configured implements Tool
                     String suffix_half_r = Node.str2dna(suffix_half_tmp_r);
                     String group_id = prefix_half_r;
                     int r_pos = end - i;
-                    String Qscore_reverse = new StringBuffer(node.Qscore_1()).reverse().toString();
+                    //String Qscore_reverse = new StringBuffer(node.Qscore_1()).reverse().toString();
+                    String Qscore_reverse = new StringBuffer(node.QV()).reverse().toString();
                     if ( !window_tmp_r.matches("A*") && !window_tmp_r.matches("T*") ){
                         if (group_sub.get(group_id) != null) {
                             String sub = group_sub.get(group_id);
@@ -189,7 +206,7 @@ public class FindError extends Configured implements Tool
             }
              for(String id : group_sub.keySet()) {
                 String sub = group_sub.get(id);
-                output.collect(new Text(id), new Text(node.getNodeId() + "\t" + node.str_raw() + "\t" + node.Qscore_1() + "\t" + sub));
+                output.collect(new Text(id), new Text(node.getNodeId() + "\t" + node.str_raw() + "\t" + node.QV_raw() + "\t" + sub));
             }
 		}
 	}
@@ -221,21 +238,40 @@ public class FindError extends Configured implements Tool
 				id = id1;
                 pos = pos1;
                 //len = len1;
+                String qv = Node.dna2str(qv1);
                 if (dir1.equals("f")) {
                     dir = true;
                     //seq = Node.dna2str(seq1).toCharArray();
                     seq = Node.dna2str(seq1).getBytes();
-                    int_qv = new byte[qv1.length()];
+                    int_qv = new byte[qv.length()];
                     for(int i=0; i < int_qv.length; i++){
-                        int_qv[i] = (byte)((int)qv1.charAt(i)-33);
+                        //int_qv[i] = (byte)((int)qv1.charAt(i)-33)
+                        if (qv.charAt(i) == 'A') {
+                            int_qv[i] = 0;
+                        } else if (qv.charAt(i) == 'T') {
+                            int_qv[i] = 10;
+                        } else if (qv.charAt(i) == 'C') {
+                            int_qv[i] = 20;
+                        } else if (qv.charAt(i) == 'G') {
+                            int_qv[i] = 30;
+                        }
                     }
                 } else {
                     dir = false;
                     //seq = Node.rc(Node.dna2str(seq1)).toCharArray();
                     seq = Node.rc(Node.dna2str(seq1)).getBytes();
-                    int_qv = new byte[qv1.length()];
+                    int_qv = new byte[qv.length()];
                     for(int i=0; i < int_qv.length; i++){
-                        int_qv[i] = (byte)((int)qv1.charAt(int_qv.length-1-i)-33);
+                        //int_qv[i] = (byte)((int)qv1.charAt(int_qv.length-1-i)-33);
+                        if (qv.charAt(int_qv.length-1-i) == 'A') {
+                            int_qv[i] = 0;
+                        } else if (qv.charAt(int_qv.length-1-i) == 'T') {
+                            int_qv[i] = 10;
+                        } else if (qv.charAt(int_qv.length-1-i) == 'C') {
+                            int_qv[i] = 20;
+                        } else if (qv.charAt(int_qv.length-1-i) == 'G') {
+                            int_qv[i] = 30;
+                        }
                     }
                 }
 			}

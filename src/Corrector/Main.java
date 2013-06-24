@@ -209,7 +209,7 @@ public class Main extends Configured implements Tool
         job = bhk.run(basePath + loadreads, basePath + stopword);
         end(job);
         long hkmer = counter(job, "hkmer");
-        msg("H_kmer: " + hkmer);
+        msg(" H_kmer: " + hkmer);
         msg("\n");
        
 	}
@@ -234,7 +234,8 @@ public class Main extends Configured implements Tool
         job = pc.run(basePath + input, basePath + input + ".msg", idx_len, basePath + hkmerlist);
         long hkmer = counter(job, "hkmer");
         long fix_char = counter(job, "fix_char");
-        msg(" " +  hkmer + " HKmer_skip  " + fix_char + " fix_chars \n");
+        long base_notN = counter(job, "base_notN");
+        msg(" " +  hkmer + " HKmer_skip  "  + base_notN + " notN " + fix_char + " fix_chars \n");
         end(job);
         start("\n  PCorrection ");
         PCorrection pcorr = new PCorrection();
@@ -327,11 +328,11 @@ public class Main extends Configured implements Tool
         start("\n  Kmer Frequency of Reads");
         job = kfr.run(basePath + input, basePath + output + ".kfr");
         end(job);
-        start("\n  Identify Trusted Reads");
+        /*start("\n  Identify Trusted Reads");
         job = itr.run(basePath + output + ".kfr", basePath + output + ".itr", 1);
-        end(job);
+        end(job);*/
         start("\n  Tag Trusted Reads");
-        job = tagr.run(basePath + input + "," + basePath + output + ".itr", basePath + output);
+        job = tagr.run(basePath + input + "," + basePath + output + ".kfr", basePath + output);
         long failed_reads = counter(job, "failed_reads");
         msg("  " + failed_reads + " failed_reads \n");
         end(job);

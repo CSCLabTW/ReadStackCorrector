@@ -75,6 +75,7 @@ public class TagTrustedReads extends Configured implements Tool
             Node node = new Node(prefix.toString());
             int sawnode = 0;
             boolean trust = true;
+            int count = 0;
             while(iter.hasNext())
 			{
                 String msg = iter.next().toString();
@@ -87,17 +88,24 @@ public class TagTrustedReads extends Configured implements Tool
 				}
 				else if (vals[0].equals(Node.UPDATEMSG))
 				{
-					if (vals[1].equals("1")) {
+					/*if (vals[1].equals("1")) {
                         trust = true;
                     } else if (vals[1].equals("0")) {
                         trust = false;
-                    }
+                    }*/
+					if (vals[1].equals("1")){
+						trust = false;
+						//count = count + 1;
+					}
 				}
 				else
 				{
 					throw new IOException("Unknown msgtype: " + msg);
 				}
             }
+            /*if (count >= 24) {
+            	trust = false;
+            }*/
             if (trust) {
                 node.setisUnique(false);
             } else {

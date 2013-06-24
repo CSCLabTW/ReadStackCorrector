@@ -66,7 +66,7 @@ public class Graph2Fasta extends Configured implements Tool
 			output.collect(new Text("@" + node.getNodeId()), new Text(""));
 			output.collect(new Text(str), null);
 			output.collect(new Text("+" + node.getNodeId()), new Text(""));
-			output.collect(new Text(node.Qscore_1()), null);
+			output.collect(new Text( Node.str2qv(node.QV()) ), null);
 			
 			/*int LINE_LEN = 60;
 

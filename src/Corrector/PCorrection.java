@@ -239,27 +239,27 @@ public class PCorrection extends Configured implements Tool
                 for(int i=0; i < array.length; i++){
                     if (array[i][4] > 0 && array[i][0]==array[i][4] && exclusive[i] == true ) {
                         fix_str = fix_str + "A";
-                        fix_qv = fix_qv + (char)33;
+                        fix_qv = fix_qv + "A"; // A == 0
                         reporter.incrCounter("Brush", "fix_char", 1);
                     } else if (array[i][4] > 0 && array[i][1]==array[i][4] && exclusive[i] == true) {
                         fix_str = fix_str + "T";
-                        fix_qv = fix_qv + (char)33;
+                        fix_qv = fix_qv + "A"; // A == 0
                         reporter.incrCounter("Brush", "fix_char", 1);
                     } else if (array[i][4] > 0 && array[i][2]==array[i][4] && exclusive[i] == true) {
                         fix_str = fix_str + "C";
-                        fix_qv = fix_qv + (char)33;
+                        fix_qv = fix_qv + "A"; // A == 0
                         reporter.incrCounter("Brush", "fix_char", 1);
                     } else if (array[i][4] > 0 && array[i][3]==array[i][4] && exclusive[i] == true) {
                         fix_str = fix_str + "G";
-                        fix_qv = fix_qv + (char)33;
+                        fix_qv = fix_qv + "A"; // A == 0
                         reporter.incrCounter("Brush", "fix_char", 1);
                     } else {
                         fix_str = fix_str + node.str().charAt(i);
-                        fix_qv = fix_qv + node.Qscore_1().charAt(i);
+                        fix_qv = fix_qv + node.QV().charAt(i);
                     }
                 }
                 node.setstr(fix_str);
-                node.setQscore(fix_qv);
+                node.setQV(fix_qv);
             }
             output.collect(nodeid, new Text(node.toNodeMsg()));
 		}

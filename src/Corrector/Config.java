@@ -60,7 +60,10 @@ public class Config {
 	public static long LOW_KMER = 1;
 	public static long UP_KMER = 500;
 
-    // stats
+    // randomize threshold
+	public static long RANDOM_PASS = 100;
+	
+	// stats
 	public static String RUN_STATS = null;
 	public static long  N50_TARGET = -1;
 	public static String CONVERT_FA = null;
@@ -88,8 +91,9 @@ public class Config {
 		conf.set("mapred.task.timeout", Long.toString(HADOOP_TIMEOUT));
 		conf.setLong("LOCALNODES", HADOOP_LOCALNODES);
 
-
-        conf.setLong("UP_KMER", UP_KMER);
+		conf.setLong("RANDOM_PASS", RANDOM_PASS);
+        
+		conf.setLong("UP_KMER", UP_KMER);
         conf.setLong("LOW_KMER", LOW_KMER);
         conf.setLong("K", K);
         conf.setLong("READLENGTH", READLEN);
@@ -118,6 +122,8 @@ public class Config {
         Main.msg("READLENGTH = "               + READLEN + "\n");
 		Main.msg("K = "               + K + "\n");
         Main.msg("READ STACK UPPER BOUND = "    + UP_KMER + "\n");
+        Main.msg("RANDOM PASS = "    + RANDOM_PASS + "\n");
+        
 		//Main.msg("KMER LOW BOUND = "  + LOW_KMER + "\n");
 		
 
@@ -154,6 +160,9 @@ public class Config {
         // initial graph
         options.addOption(OptionBuilder.withArgName("read length").hasArg().withDescription("Read Length ").create("readlen"));
       
+        // randomize threshold
+        options.addOption(OptionBuilder.withArgName("random pass").hasArg().withDescription("Random Pass ").create("random"));
+        
         // kmer status
         options.addOption(OptionBuilder.withArgName("kmer upper bound").hasArg().withDescription("max kmer cov (default: " + UP_KMER ).create("kmerup"));
 		options.addOption(OptionBuilder.withArgName("kmer lower bound").hasArg().withDescription("min kmer cov (default: " + LOW_KMER).create("kmerlow"));
@@ -182,9 +191,10 @@ public class Config {
 	        	if (line.hasOption("expert"))
 	        	{
 	        	System.out.print(
-                                 "  -kmerup <coverage>  : Read stack upper bound [200]\n" +
+                                 "  -kmerup <coverage>  : Read stack upper bound [500]\n" +
                                  //"  -kmerlow <coveage>  : Kmer coverage lower bound [1]\n" +
-	    		                 "\n" +
+	    		                 "  -random <pass rate> : Randomized pass message [100]\n" + 
+                                 "\n" +
 	        			         "Hadoop Options:\n" +
 	        			         "===============\n" +
 	    		                 "  -javaopts <opts>    : Hadoop Java Opts [" + HADOOP_JAVAOPTS + "]\n" +
@@ -204,6 +214,7 @@ public class Config {
 	        if (line.hasOption("timeout"))  { HADOOP_TIMEOUT  = Long.parseLong(line.getOptionValue("timeout")); }
             if (line.hasOption("readlen"))     { READLEN     = Long.parseLong(line.getOptionValue("readlen")); }
             if (line.hasOption("kmerup"))       { UP_KMER      = Long.parseLong(line.getOptionValue("kmerup")); }  
+            if (line.hasOption("random"))       { RANDOM_PASS      = Long.parseLong(line.getOptionValue("random")); }  
             if (line.hasOption("start")) { STARTSTAGE = line.getOptionValue("start"); }
 	        if (line.hasOption("stop"))  { STOPSTAGE  = line.getOptionValue("stop");  }
 	    }

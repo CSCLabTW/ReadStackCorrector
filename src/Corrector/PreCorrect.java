@@ -134,7 +134,7 @@ public class PreCorrect extends Configured implements Tool
                     int f_pos = i + (IDX/2);
                     if ( !window_tmp.matches("A*") && !window_tmp.matches("T*") ){
                          output.collect(new Text(prefix_half),
-                                   new Text(node.getNodeId() + "\t" + "f" + "\t" + f_pos + "\t" + node.str().charAt(f_pos) + "\t" + node.Qscore_1().charAt(f_pos) + "\t" + suffix_half + "\t" + node.str().length()));
+                                   new Text(node.getNodeId() + "\t" + "f" + "\t" + f_pos + "\t" + node.str().charAt(f_pos) + "\t" + node.QV().charAt(f_pos) + "\t" + suffix_half + "\t" + node.str().length()));
                     }
                 } else if (window_tmp_r.compareTo(window_tmp) < 0) {
                     String prefix_half_tmp_r = window_tmp_r.substring(0, IDX/2);
@@ -142,11 +142,12 @@ public class PreCorrect extends Configured implements Tool
                     String prefix_half_r = Node.str2dna(prefix_half_tmp_r);
                     String suffix_half_r = Node.str2dna(suffix_half_tmp_r);
                     int r_pos = end - i + (IDX/2);
-                    String Qscore_reverse = new StringBuffer(node.Qscore_1()).reverse().toString();
+                    //String Qscore_reverse = new StringBuffer(node.Qscore_1()).reverse().toString();
+                    String QV_reverse = new StringBuffer(node.QV()).reverse().toString();
                     if ( !window_tmp_r.matches("A*") && !window_tmp_r.matches("T*") ){
                         //try { 
                     	output.collect(new Text(prefix_half_r),
-                                   new Text(node.getNodeId() + "\t" + "r" + "\t" + r_pos + "\t" + Node.rc(node.str()).charAt(r_pos) + "\t" + node.Qscore_1().charAt(r_pos) + "\t" + suffix_half_r + "\t" + node.str().length()));
+                                   new Text(node.getNodeId() + "\t" + "r" + "\t" + r_pos + "\t" + Node.rc(node.str()).charAt(r_pos) + "\t" + node.QV().charAt(r_pos) + "\t" + suffix_half_r + "\t" + node.str().length()));
                         //} catch (Exception e) {
                         //	throw new IOException("node_len: " + node.str().length() + " r_pos: " + r_pos + " qv_len: " + node.Qscore_1().length() + " r_pos: " + r_pos  );
                         //}
@@ -209,7 +210,16 @@ public class PreCorrect extends Configured implements Tool
                 }
                 pos = pos1;
                 base = base1.getBytes()[0];
-                qv = qv1.getBytes()[0];
+                //qv = qv1.getBytes()[0];
+                if (qv1.equals("A")) {
+                    qv = 0;
+                } else if (qv1.equals("T")) {
+                    qv = 10;
+                } else if (qv1.equals("C")) {
+                    qv = 20;
+                } else if (qv1.equals("G")) {
+                    qv = 30;
+                }
                 len = len1;
 			}
 
@@ -295,7 +305,7 @@ public class PreCorrect extends Configured implements Tool
                 for(int j=0; j < (left_len - (readarray[i].pos)); j++) {
                     start_pos = start_pos + " ";
                 }
-                output.collect(new Text("MSG"), new Text(start_pos + new String(readarray[i].base)+ " " + readarray[i].dir + " " + readarray[i].id + " " + readarray[i].pos));
+                output.collect(new Text("MSG"), new Text(start_pos + " " + new String((char)readarray[i].base+"")+ " " + readarray[i].dir + " " + readarray[i].id + " " + readarray[i].pos + " " + new String((char)readarray[i].base+"")));
             }*/
             //\\\\\\\ debug
             //\\\
@@ -312,7 +322,8 @@ public class PreCorrect extends Configured implements Tool
             for(int i=0; i < readarray.length; i++) {
                 ReadInfo readitem = readarray[i];
                 base_array[4] = base_array[4] + 1;
-                int quality_value = ((int)readitem.qv-33);
+                //int quality_value = ((int)readitem.qv-33);
+                int quality_value = ((int)readitem.qv);
                 char base_char = (char)readitem.base;
                 if (quality_value < 0 ) {
                     quality_value = 0;
@@ -360,25 +371,27 @@ public class PreCorrect extends Configured implements Tool
                 winner_sum = base_array[3];
             }
             
+            //output.collect(new Text("DEBUG"), new Text( "[" + correct_base + "]" + base_array[0] + "|" + base_array[1] + "|" + base_array[2] + "|" + base_array[3]));
             if (correct_base != 'N') {
+                reporter.incrCounter("Brush", "base_notN", 1);
                 boolean fix = true;
                 for(int i=0; i < readarray.length; i++) {
                     ReadInfo readitem = readarray[i];
                     if ((char)readitem.base != correct_base) {
                         //\\
-                        if ((char)readitem.base == 'A' && ((float)base_array[0]/winner_sum > 0.25f /*|| !lose_A*/ )){
+                        if ((char)readitem.base == 'A' && ((float)base_array[0]/(float)winner_sum > 0.25f /*|| !lose_A*/ )){
                             fix = false;
                             //continue;
                         }
-                        if ((char)readitem.base == 'T' && ((float)base_array[1]/winner_sum > 0.25f /*|| !lose_T*/ )){
+                        if ((char)readitem.base == 'T' && ((float)base_array[1]/(float)winner_sum > 0.25f /*|| !lose_T*/ )){
                             fix = false;
                             //continue;
                         }
-                        if ((char)readitem.base == 'C' && ((float)base_array[2]/winner_sum > 0.25f /*|| !lose_C*/ )){
+                        if ((char)readitem.base == 'C' && ((float)base_array[2]/(float)winner_sum > 0.25f /*|| !lose_C*/ )){
                             fix = false;
                             //continue;
                         }
-                        if ((char)readitem.base == 'G' && ((float)base_array[3]/winner_sum > 0.25f /*|| !lose_G*/ )){
+                        if ((char)readitem.base == 'G' && ((float)base_array[3]/(float)winner_sum > 0.25f /*|| !lose_G*/ )){
                             fix = false;
                             //continue;
                         }

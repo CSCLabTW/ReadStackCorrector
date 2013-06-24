@@ -324,6 +324,40 @@ public class Node {
 
         return sb.toString();
 	}
+    
+    public static String qv2str(String qv)
+    {
+        String str = "";
+        for(int i=0; i < qv.length(); i++) {
+            if ((int)qv.charAt(i)-33 <= 9) {
+                str = str + "A";
+            } else if ((int)qv.charAt(i)-33 > 9 && (int)qv.charAt(i)-33 <= 19) {
+                str = str + "T";
+            } else if ((int)qv.charAt(i)-33 > 19 && (int)qv.charAt(i)-33 <= 29) {
+                str = str + "C";
+            } else {
+                str = str + "G";
+            }
+        }
+        return str;
+    }
+    
+    public static String str2qv(String qv)
+    {
+        String str = "";
+        for(int i=0; i < qv.length(); i++) {
+            if (qv.charAt(i) == 'A') {
+                str = str + (char)(33+0);
+            } else if (qv.charAt(i) == 'T') {
+                str = str + (char)(33+10);
+            } else if (qv.charAt(i) == 'C') {
+                str = str + (char)(33+20);
+            } else if (qv.charAt(i) == 'G') {
+                str = str + (char)(33+30);
+            }
+        }
+        return str;
+    }
    
     private List<String> getOrAddField(String field)
 	{
@@ -457,7 +491,7 @@ public class Node {
 		l.add(Node.str2dna(str));
 	}
     
-    public String Qscore()
+    /*public String Qscore()
 	{
 		return fields.get(QV).get(0);
 	}
@@ -477,8 +511,30 @@ public class Node {
     public void clearQscore()
 	{
 		fields.remove(QV);
-	}
+	}*/
 	
+    public String QV()
+	{
+		return dna2str(fields.get(QV).get(0));
+	}
+    
+    public String QV_raw()
+	{
+		return fields.get(QV).get(0);
+	}
+    
+    public void setQV(String qv)
+	{
+		List<String> l = getOrAddField(QV);
+		l.clear();		
+		l.add(Node.str2dna(qv));
+	}
+    
+    public void clearQV()
+	{
+		fields.remove(QV);
+	}
+    
 	public int len()
 	{
 		return str().length();
@@ -586,7 +642,8 @@ public class Node {
         if (fields.containsKey(QV))
 		{
             sb.append("\t*"); sb.append(QV);
-            sb.append("\t"); sb.append(Qscore());
+            //sb.append("\t"); sb.append(Qscore());
+            sb.append("\t"); sb.append(QV_raw());
         }
 
 		sb.append("\t*"); sb.append(COVERAGE);
@@ -777,6 +834,7 @@ public class Node {
         System.out.println("[" + sb.toString()+ "]");
         sb.setCharAt(2, 'A');
         System.out.println(sb.toString());
+        System.out.println("BBBEBBBBBBBB	".length());
         
         //System.out.println("ATCGATCG".substring(3));
     }

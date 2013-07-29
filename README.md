@@ -20,6 +20,10 @@ step 3: exceute the ReadStackCorrector
 e.g. hadoop jar ReadStackCorrector.jar -in Ecoli -out Ecoli_ec
 
 
-step 4: download *.fasta from HDFS
+step 4: download *.fastq from HDFS
 
-e.g. hadoop fs -cat Ecoli_ec_file/* > Ecoli_ec.fasta
+e.g. hadoop fs -cat Ecoli_ec_file/* > Ecoli_ec.fastq
+
+(You can use CloudBrush as postprocessor to do the de novo assembly
+e.g hadoop jar CloudBrush.jar -reads Ecoli_ec -asm Ecoli_ec_Brush -k 21 -readlen 36
+More details about CloudBrush Project you can get under: https://github.com/ice91/CloudBrush) 

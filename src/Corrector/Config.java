@@ -50,6 +50,7 @@ public class Config {
 	public static int RESTART_TIP_REMAIN = 0;
 	public static int RESTART_COMPRESS = 0;
 	public static int RESTART_COMPRESS_REMAIN = 0;
+	public static String SCREENING = "on";
 
     // initial node construction
 	public static long K = -1;
@@ -123,6 +124,7 @@ public class Config {
 		Main.msg("K = "               + K + "\n");
         Main.msg("READ STACK UPPER BOUND = "    + UP_KMER + "\n");
         Main.msg("RANDOM PASS = "    + RANDOM_PASS + "\n");
+        Main.msg("SCREENING PHASE = "    + SCREENING + "\n");
         
 		//Main.msg("KMER LOW BOUND = "  + LOW_KMER + "\n");
 		
@@ -156,7 +158,9 @@ public class Config {
         // job restart
 		options.addOption(OptionBuilder.withArgName("stage").hasArg().withDescription("Starting stage").create("start"));
 		options.addOption(OptionBuilder.withArgName("stage").hasArg().withDescription("Stop stage").create("stop"));
-
+		options.addOption(OptionBuilder.withArgName("stage").hasArg().withDescription("Screening stage").create("screening"));
+        
+		
         // initial graph
         options.addOption(OptionBuilder.withArgName("read length").hasArg().withDescription("Read Length ").create("readlen"));
       
@@ -185,6 +189,7 @@ public class Config {
 	    		                 "  -in <indir>         : Directory with reads [required]\n" + 
 	    		                 "  -work <workdir>     : Local directory for log files [" + localBasePath + "]\n" +
 	    		                 "  -slots <slots>      : Hadoop Slots to use [" + HADOOP_MAPPERS + "]\n" +
+	    		                 "  -screening <on/off> : Switch of Screening Phase\n" +
 	        	                 "  -expert             : Show expert options\n");
 	        	
 	        	
@@ -217,6 +222,7 @@ public class Config {
             if (line.hasOption("random"))       { RANDOM_PASS      = Long.parseLong(line.getOptionValue("random")); }  
             if (line.hasOption("start")) { STARTSTAGE = line.getOptionValue("start"); }
 	        if (line.hasOption("stop"))  { STOPSTAGE  = line.getOptionValue("stop");  }
+	        if (line.hasOption("screening"))  { SCREENING  = line.getOptionValue("screening");  }
 	    }
 	    catch( ParseException exp )
 	    {

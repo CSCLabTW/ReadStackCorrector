@@ -394,19 +394,23 @@ public class Main extends Configured implements Tool
             ErrorCorrection(Config.hadoopTmpPath, precorrect, finderror, 24, stopwords);
         }
         
+        String current=finderror;
+        if ( Config.SCREENING.equals("on") ){
+	        if (runStage("screening")){
+	            Screening(Config.hadoopTmpPath, finderror, screening, 24);
+	        } 
+	        current = screening;
+        }
+
         if (runStage("convertFasta"))
         {
-            convertFasta(Config.hadoopTmpPath, finderror, Config.hadoopBasePath);
+            convertFasta(Config.hadoopTmpPath, current, Config.hadoopBasePath);
             checkDone();
         }
         
-        if (runStage("screening")){
-            Screening(Config.hadoopTmpPath, finderror, screening, 24);
-        } 
-
         if (runStage("convertSfa"))
         {
-            convertSfa(Config.hadoopTmpPath, screening, Config.hadoopBasePath);
+            convertSfa(Config.hadoopTmpPath, current, Config.hadoopBasePath);
             ECendtime = System.currentTimeMillis();
             checkDone();
         }
